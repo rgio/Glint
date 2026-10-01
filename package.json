@@ -1,0 +1,16 @@
+{
+  "name": "podcast-app",
+  "private": true,
+  "packageManager": "pnpm@10.30.3",
+  "scripts": {
+    "dev:api": "pnpm --filter @podcast/api dev",
+    "dev:client": "pnpm --filter @podcast/client start",
+    "test": "turbo run test",
+    "typecheck": "turbo run typecheck",
+    "lint": "turbo run lint"
+  },
+  "devDependencies": {
+    "turbo": "^2.11.6",
+    "typescript": "~6.0.3"
+  }
+}
