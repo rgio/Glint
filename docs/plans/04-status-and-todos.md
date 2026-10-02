@@ -31,12 +31,12 @@ P1 and P2 items (F-16 to F-27) are not started, as planned. The feed parser alre
 | Monorepo (pnpm + Turbo) | ✅ | |
 | Shared models + rules | ✅ | Unit-tested |
 | Lenient feed parser | ✅ | One fixture. The spec wants a 500-feed snapshot corpus. |
-| API: resolve feed, podcast, episodes | ✅ | In-memory store only |
+| API: resolve feed, podcast, episodes | ✅ | Postgres when `DATABASE_URL` is set, in memory otherwise |
 | Safe feed fetching (SSRF guard, ETag) | ✅ | |
 | `AudioPlayer` native + web | ✅ | Background playback config and lock screen via expo-audio; Media Session on web |
 | Local persistence | ✅ | Zustand `persist` over a key-value store: IndexedDB on web, `expo-sqlite/kv-store` on native (`src/storage/`). Library and player state (subscriptions, queue, positions, played, speed) survive reloads; verified in a browser. Not a relational DB yet; revisit when sync needs an outbox. |
-| PostgreSQL `CatalogStore` | ⬜ | Interface ready in `apps/api/src/store.ts` |
-| Feed worker (adaptive polling, WebSub) | ⬜ | `apps/feed-worker` doesn't exist yet |
+| PostgreSQL `CatalogStore` | ✅ | `apps/api/src/postgres-store.ts` with SQL migrations in `src/db/migrations` (applied on startup). One contract test suite runs against both stores (`test/store.test.ts`; the Postgres half needs `TEST_DATABASE_URL`). The client also re-adds a show by its saved feed URL if the server ever answers 404 for it. |
+| Feed worker (adaptive polling, WebSub) | ⬜ | `apps/feed-worker` doesn't exist yet. Stand-in: on-request refresh of feeds older than an hour (see step 5). |
 | Redis, object storage / CDN | ⬜ | |
 | Settings screen, onboarding, `/episode/[id]` route | ⬜ | Spec routes not yet built |
 | Wide-screen layout (sidebar + right-hand player at >1024 px) | ⬜ | |
@@ -54,7 +54,7 @@ P1 and P2 items (F-16 to F-27) are not started, as planned. The feed parser alre
 2. ~~Get a Podcast Index key and check search and charts against the real service.~~ Done. Note: quote the secret in `.env` if it contains `#`.
 3. Run the slice on an iOS simulator and an Android emulator to confirm background audio and lock-screen controls. This is the spec's phase-1 "audio spike" gate.
 4. ~~Add local persistence for the player and library stores.~~ Done (key-value; see above).
-5. Postgres `CatalogStore` plus a feed worker with adaptive polling.
+5. ~~Postgres `CatalogStore`.~~ Done. Next: a feed worker with adaptive polling. Until then the API re-checks a feed in the background when a show is requested and the feed is over an hour old (`Catalog.refreshIfStale`, conditional GET, 10-minute back-off after failures), so shows nobody opens never update and Home's "New" only updates for shows listeners open.
 6. ~~Podcast Index integration for search (F-02) and trending (F-01).~~ Built; needs the key (step 2).
 7. Sleep timer (F-14), downloads (F-10) and OPML (F-03).
 8. Auth, then the sync outbox and `/v1/sync` (F-12, F-13).

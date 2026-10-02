@@ -85,6 +85,102 @@ describe('GET /v1/podcasts/:id/episodes', () => {
   });
 });
 
+describe('background feed refresh', () => {
+  const HOUR = 60 * 60_000;
+  const newEpisode = `<item>
+      <title>Episode three</title>
+      <guid>ep-3</guid>
+      <pubDate>Thu, 01 Oct 2026 08:00:00 GMT</pubDate>
+      <enclosure url="https://cdn.example.com/ep3.mp3" type="audio/mpeg" length="1"/>
+    </item>
+    <item>`;
+
+  async function setupRefresh() {
+    let now = Date.UTC(2026, 9, 2);
+    let nextResult: Awaited<ReturnType<FetchFeed>> | Error = {
+      notModified: false,
+      xml,
+      etag: '"v1"',
+      lastModified: null,
+      finalUrl: '',
+    };
+    const fetchFeed = vi.fn<FetchFeed>(async () => {
+      if (nextResult instanceof Error) throw nextResult;
+      return nextResult;
+    });
+    const app = buildApp({ fetchFeed, now: () => now });
+    const { podcast } = (
+      await app.inject({ method: 'POST', url: '/v1/podcasts/resolve', payload: { feedUrl: 'https://example.com/feed.xml' } })
+    ).json();
+    const titles = async () =>
+      (await app.inject({ url: `/v1/podcasts/${podcast.id}/episodes` })).json().episodes.map((e: { title: string }) => e.title);
+    return {
+      app,
+      fetchFeed,
+      id: podcast.id as string,
+      titles,
+      advance: (ms: number) => (now += ms),
+      willReturn: (result: typeof nextResult) => (nextResult = result),
+    };
+  }
+
+  it('leaves a recently fetched feed alone', async () => {
+    const { app, fetchFeed, id, advance } = await setupRefresh();
+    advance(HOUR - 1000);
+    await app.inject({ url: `/v1/podcasts/${id}` });
+    await app.inject({ url: `/v1/podcasts/${id}/episodes` });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(fetchFeed).toHaveBeenCalledTimes(1);
+  });
+
+  it('re-fetches a stale feed conditionally and picks up new episodes', async () => {
+    const { app, fetchFeed, id, titles, advance, willReturn } = await setupRefresh();
+    advance(HOUR);
+    willReturn({ notModified: false, xml: xml.replace('<item>', newEpisode), etag: '"v2"', lastModified: null, finalUrl: '' });
+
+    // Details and episodes are requested together, as the show page does: one fetch between them.
+    await Promise.all([app.inject({ url: `/v1/podcasts/${id}` }), app.inject({ url: `/v1/podcasts/${id}/episodes` })]);
+    await vi.waitFor(async () => expect(await titles()).toContain('Episode three'));
+    expect(fetchFeed).toHaveBeenCalledTimes(2);
+    expect(fetchFeed.mock.calls[1]![1]).toMatchObject({ etag: '"v1"' });
+  });
+
+  it('counts a "not modified" answer as a fresh check', async () => {
+    const { app, fetchFeed, id, advance, willReturn } = await setupRefresh();
+    advance(HOUR);
+    willReturn({ notModified: true });
+    await app.inject({ url: `/v1/podcasts/${id}` });
+    await vi.waitFor(() => expect(fetchFeed).toHaveBeenCalledTimes(2));
+
+    advance(HOUR - 1000);
+    await app.inject({ url: `/v1/podcasts/${id}` });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(fetchFeed).toHaveBeenCalledTimes(2);
+  });
+
+  it('still answers when the refresh fails, and waits before retrying', async () => {
+    const { app, fetchFeed, id, titles, advance, willReturn } = await setupRefresh();
+    advance(HOUR);
+    willReturn(new Error('feed host down'));
+    const res = await app.inject({ url: `/v1/podcasts/${id}` });
+    expect(res.statusCode).toBe(200);
+    await vi.waitFor(() => expect(fetchFeed).toHaveBeenCalledTimes(2));
+    await new Promise((r) => setTimeout(r, 20));
+
+    // Requests right after a failure don't retry...
+    expect(await titles()).toEqual(['Episode two', 'Episode one']);
+    await app.inject({ url: `/v1/podcasts/${id}` });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(fetchFeed).toHaveBeenCalledTimes(2);
+
+    // ...but ten minutes later they do.
+    advance(10 * 60_000);
+    willReturn({ notModified: true });
+    await app.inject({ url: `/v1/podcasts/${id}` });
+    await vi.waitFor(() => expect(fetchFeed).toHaveBeenCalledTimes(3));
+  });
+});
+
 describe('search and discover', () => {
   const show = {
     feedUrl: 'https://feeds.example.com/show.xml',

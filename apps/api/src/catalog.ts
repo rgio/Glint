@@ -60,10 +60,20 @@ export function normalizeFeedUrl(input: string): string {
   return url.toString();
 }
 
+/** How long a feed is trusted before a request for it triggers a background re-check. */
+export const REFRESH_AFTER_MS = 60 * 60_000;
+/** After a failed re-check, wait this long before trying that feed again. */
+export const RETRY_AFTER_FAILURE_MS = 10 * 60_000;
+
 export class Catalog {
+  private refreshing = new Map<string, Promise<void>>();
+  private failedAt = new Map<string, number>();
+
   constructor(
     private store: CatalogStore,
     private fetchFeed: FetchFeed,
+    private now: () => number = Date.now,
+    private onRefreshError: (err: unknown, podcast: Podcast) => void = () => {},
   ) {}
 
   /**
@@ -77,6 +87,32 @@ export class Catalog {
     return this.ingest(feedUrl);
   }
 
+  /**
+   * Re-fetches a known feed in the background if it hasn't been checked for an hour, so new
+   * episodes show up. A stand-in until the feed worker polls feeds on its own schedule.
+   */
+  refreshIfStale(podcast: Podcast): Promise<void> {
+    const running = this.refreshing.get(podcast.id);
+    if (running) return running;
+    if (this.now() - (this.failedAt.get(podcast.id) ?? -Infinity) < RETRY_AFTER_FAILURE_MS) {
+      return Promise.resolve();
+    }
+    const run = (async () => {
+      const cache = await this.store.getFeedCache(podcast.id);
+      const fetchedAt = cache?.fetchedAt ? Date.parse(cache.fetchedAt) : 0;
+      if (this.now() - fetchedAt >= REFRESH_AFTER_MS) await this.ingest(podcast.feedUrl);
+      this.failedAt.delete(podcast.id);
+    })()
+      .catch((err) => {
+        // Don't hammer a host that's down: every request would otherwise retry.
+        this.failedAt.set(podcast.id, this.now());
+        this.onRefreshError(err, podcast);
+      })
+      .finally(() => this.refreshing.delete(podcast.id));
+    this.refreshing.set(podcast.id, run);
+    return run;
+  }
+
   /** Fetches a feed (conditionally, when we have cache headers) and stores the result. */
   async ingest(feedUrl: string): Promise<Podcast> {
     const id = podcastIdFor(feedUrl);
@@ -84,8 +120,10 @@ export class Catalog {
     const result = await this.fetchFeed(feedUrl, cache);
     if (result.notModified) {
       const podcast = await this.store.findPodcastById(id);
-      if (podcast) return podcast;
-      return this.ingestUncached(feedUrl, id);
+      if (!podcast || !cache) return this.ingestUncached(feedUrl, id);
+      // Unchanged, but checked: don't re-check for another hour.
+      await this.store.upsertPodcast(podcast, { ...cache, fetchedAt: new Date(this.now()).toISOString() });
+      return podcast;
     }
     return this.save(feedUrl, id, result.xml, result.etag, result.lastModified);
   }
@@ -105,7 +143,7 @@ export class Catalog {
   ): Promise<Podcast> {
     const feed = parseFeed(xml);
     const podcast = toPodcast(id, feedUrl, feed);
-    await this.store.upsertPodcast(podcast, { etag, lastModified });
+    await this.store.upsertPodcast(podcast, { etag, lastModified, fetchedAt: new Date(this.now()).toISOString() });
     await this.store.upsertEpisodes(toEpisodes(id, feed));
     return podcast;
   }

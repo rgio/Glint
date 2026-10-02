@@ -12,6 +12,8 @@ import { InMemoryCatalogStore, type CatalogStore } from './store';
 export type AppDeps = {
   store?: CatalogStore;
   fetchFeed?: FetchFeed;
+  /** Clock for feed freshness checks; tests move it forward. */
+  now?: () => number;
   /** Search and charts. Without one, those endpoints answer 503. */
   directory?: PodcastDirectory;
   corsOrigins?: string[];
@@ -44,8 +46,10 @@ const DiscoverQuery = z.object({
 
 export function buildApp(deps: AppDeps = {}) {
   const store = deps.store ?? new InMemoryCatalogStore();
-  const catalog = new Catalog(store, deps.fetchFeed ?? defaultFetchFeed);
   const app = Fastify({ logger: deps.logger ?? false });
+  const catalog = new Catalog(store, deps.fetchFeed ?? defaultFetchFeed, deps.now, (err, podcast) =>
+    app.log.warn({ err, podcastId: podcast.id }, 'background feed refresh failed'),
+  );
 
   app.register(cors, { origin: deps.corsOrigins ?? true });
 
@@ -88,12 +92,14 @@ export function buildApp(deps: AppDeps = {}) {
   app.get<{ Params: { id: string } }>('/v1/podcasts/:id', async (req, reply) => {
     const podcast = await store.findPodcastById(req.params.id);
     if (!podcast) return reply.status(404).send({ error: 'not_found' });
+    void catalog.refreshIfStale(podcast);
     return { podcast };
   });
 
   app.get<{ Params: { id: string } }>('/v1/podcasts/:id/episodes', async (req, reply) => {
     const podcast = await store.findPodcastById(req.params.id);
     if (!podcast) return reply.status(404).send({ error: 'not_found' });
+    void catalog.refreshIfStale(podcast);
     const { cursor, limit, sort } = EpisodeListQuery.parse(req.query);
     const episodes = await store.listEpisodes(podcast.id, { offset: cursor, limit, sort });
     return {

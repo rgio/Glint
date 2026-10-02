@@ -1,10 +1,16 @@
 import type { Episode, Podcast } from '@podcast/shared';
 
-export type FeedCacheInfo = { etag: string | null; lastModified: string | null };
+export type FeedCacheInfo = {
+  /** Conditional-request headers from the last fetch. */
+  etag: string | null;
+  lastModified: string | null;
+  /** ISO time of the last fetch, including "not modified" answers. */
+  fetchedAt: string | null;
+};
 
 /**
- * Catalog storage. The in-memory version backs tests and local development;
- * the PostgreSQL implementation will satisfy the same interface.
+ * Catalog storage. `PostgresCatalogStore` is the real one; the in-memory version backs tests
+ * and runs when no database is configured.
  */
 export interface CatalogStore {
   findPodcastById(id: string): Promise<Podcast | null>;
@@ -18,6 +24,8 @@ export interface CatalogStore {
     opts: { offset: number; limit: number; sort: 'newest' | 'oldest' },
   ): Promise<Episode[]>;
 }
+
+const byteOrder = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
 
 export class InMemoryCatalogStore implements CatalogStore {
   private podcasts = new Map<string, Podcast>();
@@ -53,7 +61,8 @@ export class InMemoryCatalogStore implements CatalogStore {
     const dir = sort === 'newest' ? -1 : 1;
     return [...this.episodes.values()]
       .filter((e) => e.podcastId === podcastId)
-      .sort((a, b) => dir * (a.publishedAt ?? '').localeCompare(b.publishedAt ?? ''))
+      // Same order as Postgres: undated last when newest-first, first when oldest-first; ties by id.
+      .sort((a, b) => dir * (a.publishedAt ?? '').localeCompare(b.publishedAt ?? '') || byteOrder(a.id, b.id))
       .slice(offset, offset + limit);
   }
 }
