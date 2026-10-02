@@ -1,6 +1,8 @@
 import type { Category, DirectoryPodcast, Episode, Podcast } from '@podcast/shared';
 import { Platform } from 'react-native';
 
+import { useLibrary } from '@/library/store';
+
 // Android emulators reach the host machine at 10.0.2.2, not localhost.
 const DEFAULT_API_URL = Platform.OS === 'android' ? 'http://10.0.2.2:4000' : 'http://localhost:4000';
 export const API_URL = process.env.EXPO_PUBLIC_API_URL ?? DEFAULT_API_URL;
@@ -32,18 +34,50 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return body as T;
 }
 
+// The server can forget a show the app still knows (its catalog is in memory today, and may
+// drop shows later). Ids are derived from the feed URL, so re-adding the feed restores the same
+// id. Feed URLs come from subscriptions, or from shows loaded since the app started.
+const seenFeedUrls = new Map<string, string>();
+const readding = new Map<string, Promise<unknown>>();
+
+function remember<T extends { podcast: Podcast }>(result: T): T {
+  seenFeedUrls.set(result.podcast.id, result.podcast.feedUrl);
+  return result;
+}
+
+/** Runs `load`; if the server no longer knows the podcast, re-adds its feed once and retries. */
+async function withReadd<T>(podcastId: string, load: () => Promise<T>): Promise<T> {
+  try {
+    return await load();
+  } catch (err) {
+    const feedUrl = useLibrary.getState().subscriptions[podcastId]?.podcast.feedUrl ?? seenFeedUrls.get(podcastId);
+    if (!(err instanceof ApiError && err.status === 404) || !feedUrl) throw err;
+    // Parallel requests for the same show (details and episodes) share one re-add.
+    let pending = readding.get(podcastId);
+    if (!pending) {
+      pending = api.resolvePodcast(feedUrl).finally(() => readding.delete(podcastId));
+      readding.set(podcastId, pending);
+    }
+    await pending;
+    return load();
+  }
+}
+
 export const api = {
   resolvePodcast: (feedUrl: string) =>
     request<{ podcast: Podcast }>('/v1/podcasts/resolve', {
       method: 'POST',
       body: JSON.stringify({ feedUrl }),
-    }),
+    }).then(remember),
 
-  getPodcast: (id: string) => request<{ podcast: Podcast }>(`/v1/podcasts/${encodeURIComponent(id)}`),
+  getPodcast: (id: string) =>
+    withReadd(id, () => request<{ podcast: Podcast }>(`/v1/podcasts/${encodeURIComponent(id)}`)).then(remember),
 
   listEpisodes: (id: string, cursor: string | null, limit = 50) =>
-    request<{ episodes: Episode[]; nextCursor: string | null }>(
-      `/v1/podcasts/${encodeURIComponent(id)}/episodes?limit=${limit}${cursor ? `&cursor=${cursor}` : ''}`,
+    withReadd(id, () =>
+      request<{ episodes: Episode[]; nextCursor: string | null }>(
+        `/v1/podcasts/${encodeURIComponent(id)}/episodes?limit=${limit}${cursor ? `&cursor=${cursor}` : ''}`,
+      ),
     ),
 
   search: (q: string, limit = 25) =>
