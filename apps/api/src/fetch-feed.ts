@@ -1,7 +1,9 @@
 import { lookup } from 'node:dns/promises';
 import { isIP } from 'node:net';
 
-export const USER_AGENT = 'PodcastApp/0.1 (+https://example.com/bot)';
+// Sent to feed hosts and Podcast Index. Podcast Index rejects placeholder contact URLs such as
+// example.com; add a real one (e.g. `(+https://yourapp.com/bot)`) once the app has a home.
+export const USER_AGENT = 'PodcastApp/0.1';
 const TIMEOUT_MS = 15_000;
 const MAX_BYTES = 20 * 1024 * 1024;
 const MAX_REDIRECTS = 5;

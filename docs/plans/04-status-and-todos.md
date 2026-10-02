@@ -6,8 +6,8 @@ Checked against the code on 2026-10-01 (updated later that day after persistence
 
 | ID | Feature | Status | Where / what's missing |
 | --- | --- | --- | --- |
-| F-01 | Discovery (Podcast Index trending + categories) | 🟡 | `GET /v1/discover?section=top\|category:<id>` and `/v1/discover/categories` (`apps/api/src/podcast-index.ts`), and a Trending list with category chips on Discover. Missing: filtering by the user's language/region (the API accepts `lang`, the client doesn't send it yet). **Only tested against a fake directory:** needs a Podcast Index key in `apps/api/.env` to run for real. |
-| F-02 | Search | 🟡 | `GET /v1/search?q=` (Podcast Index `search/byterm`, cached 10 min) and a debounced search box on Discover. Shows only: Podcast Index has no full-text episode search, so `type=episode` from the spec isn't built. Same key caveat as F-01. |
+| F-01 | Discovery (Podcast Index trending + categories) | 🟡 | `GET /v1/discover?section=top\|category:<id>` and `/v1/discover/categories` (`apps/api/src/podcast-index.ts`), and a Trending list with category chips on Discover, filtered to the device language (`src/lib/locale.ts`). Verified against the live Podcast Index API. Missing: region filtering. Note that Podcast Index "trending" ranks recent activity, not popularity, so the Top list skews toward small, recently active shows. |
+| F-02 | Search | 🟡 | `GET /v1/search?q=` (Podcast Index `search/byterm`, cached 10 min) and a debounced search box on Discover. Shows only: Podcast Index has no full-text episode search, so `type=episode` from the spec isn't built. Search has no language filter upstream. Verified against the live API. |
 | F-03 | Subscribe (search, show page, RSS URL) + OPML | 🟡 | Add by RSS URL and from search or charts works (`POST /v1/podcasts/resolve`), and subscribe/unsubscribe works and persists (`library/store.ts`). Missing: OPML import/export. |
 | F-04 | Show page | 🟡 | `podcast/[id].tsx` has artwork, paged episodes and "Play latest". Missing: a sort toggle in the UI (the API supports it) and season grouping. |
 | F-05 | Episode page / show notes | 🟡 | Episode rows show notes as plain text (`htmlToText`). Missing: an `/episode/[id]` route, sanitized HTML rendering, and tappable timestamps. |
@@ -46,12 +46,12 @@ P1 and P2 items (F-16 to F-27) are not started, as planned. The feed parser alre
 | Sentry, analytics | ⬜ | |
 | Git repo at `podcast-app/` | ✅ | The nested `apps/client/.git` was removed and the client committed into the main repo (`17a1a8f`). |
 | Real bundle id / package name | ⬜ | `com.example.podcast` is a placeholder |
-| Real `User-Agent` contact URL | ⬜ | `PodcastApp/0.1 (+https://example.com/bot)` in `apps/api/src/fetch-feed.ts` |
+| Real `User-Agent` contact URL | 🟡 | Now `PodcastApp/0.1` in `apps/api/src/fetch-feed.ts`: Podcast Index answered 403 to the `example.com` placeholder. Add a real contact URL once the app has a home. |
 
 ## Suggested next steps
 
 1. ~~Initialize git at `podcast-app/` and remove the nested `apps/client/.git`.~~ Done.
-2. Get a Podcast Index key (https://api.podcastindex.org/signup), put it in `apps/api/.env` (see `.env.example`), and check search and charts against the real service.
+2. ~~Get a Podcast Index key and check search and charts against the real service.~~ Done. Note: quote the secret in `.env` if it contains `#`.
 3. Run the slice on an iOS simulator and an Android emulator to confirm background audio and lock-screen controls. This is the spec's phase-1 "audio spike" gate.
 4. ~~Add local persistence for the player and library stores.~~ Done (key-value; see above).
 5. Postgres `CatalogStore` plus a feed worker with adaptive polling.

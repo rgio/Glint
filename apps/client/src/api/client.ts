@@ -49,10 +49,10 @@ export const api = {
   search: (q: string, limit = 25) =>
     request<{ results: DirectoryPodcast[] }>(`/v1/search?q=${encodeURIComponent(q)}&limit=${limit}`),
 
-  /** `section` is `top` or `category:<id>`. */
-  discover: (section: string, limit = 25) =>
+  /** `section` is `top` or `category:<id>`; `lang` is a language code such as `en`. */
+  discover: (section: string, lang: string, limit = 25) =>
     request<{ section: string; results: DirectoryPodcast[] }>(
-      `/v1/discover?section=${encodeURIComponent(section)}&limit=${limit}`,
+      `/v1/discover?section=${encodeURIComponent(section)}&lang=${encodeURIComponent(lang)}&limit=${limit}`,
     ),
 
   categories: () => request<{ categories: Category[] }>('/v1/discover/categories'),

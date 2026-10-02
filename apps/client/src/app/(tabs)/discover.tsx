@@ -2,7 +2,17 @@ import type { Category, DirectoryPodcast } from '@podcast/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, TextInput, View, type TextStyle } from 'react-native';
+import {
+  ActivityIndicator,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  useWindowDimensions,
+  View,
+  type TextStyle,
+} from 'react-native';
 
 import { api, isDirectoryNotConfigured } from '@/api/client';
 import { Button } from '@/components/button';
@@ -12,6 +22,7 @@ import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { useTheme } from '@/hooks/use-theme';
+import { deviceLanguage } from '@/lib/locale';
 
 // Shown when search and charts aren't set up on the server.
 const STARTER_FEEDS = [
@@ -39,6 +50,8 @@ const FEATURED_CATEGORIES = [
 ];
 
 const MIN_QUERY_LENGTH = 2;
+// Wide web windows wrap the category chips, since a mouse can't easily scroll them sideways.
+const WRAP_CHIPS_MIN_WIDTH = 720;
 
 // The search box's border shows focus, so hide the browser's focus ring around the inner input.
 // React Native's types only list visible outline styles, but React Native Web accepts 'none'.
@@ -75,9 +88,11 @@ export default function DiscoverScreen() {
     staleTime: 10 * 60_000,
   });
 
+  // Charts mix every language unless filtered; search has no language filter upstream.
+  const [language] = useState(deviceLanguage);
   const charts = useQuery({
-    queryKey: ['discover', section],
-    queryFn: () => api.discover(section),
+    queryKey: ['discover', section, language],
+    queryFn: () => api.discover(section, language),
     retry: retryUnlessNotConfigured,
     staleTime: 60 * 60_000,
   });
@@ -145,11 +160,7 @@ export default function DiscoverScreen() {
         <>
           {!directoryOff && (
             <>
-              <CategoryChips
-                categories={categories.data?.categories ?? []}
-                selected={section}
-                onSelect={setSection}
-              />
+              <CategoryChips categories={categories.data?.categories ?? []} selected={section} onSelect={setSection} />
               <SectionTitle>{sectionTitle(section, categories.data?.categories)}</SectionTitle>
               {charts.isPending ? (
                 <ActivityIndicator style={styles.loading} accessibilityLabel="Loading charts" />
@@ -260,38 +271,49 @@ function CategoryChips({
   onSelect: (section: string) => void;
 }) {
   const theme = useTheme();
+  const { width } = useWindowDimensions();
+  const wrap = Platform.OS === 'web' && width >= WRAP_CHIPS_MIN_WIDTH;
   const byName = new Map(categories.map((c) => [c.name.toLowerCase(), c]));
   const featured = FEATURED_CATEGORIES.map((name) => byName.get(name.toLowerCase())).filter(
     (c): c is Category => c !== undefined,
   );
-  const chips = [{ section: 'top', label: 'Top' }, ...featured.map((c) => ({ section: `category:${c.id}`, label: c.name }))];
+  const chips = [
+    { section: 'top', label: 'Top' },
+    ...featured.map((c) => ({ section: `category:${c.id}`, label: c.name })),
+  ];
 
-  return (
+  const content = chips.map((chip) => {
+    const active = chip.section === selected;
+    return (
+      <Pressable
+        key={chip.section}
+        onPress={() => onSelect(chip.section)}
+        role="tab"
+        aria-selected={active}
+        style={({ pressed }) => [
+          styles.chip,
+          { backgroundColor: active ? theme.tint : theme.backgroundElement },
+          pressed && styles.pressed,
+        ]}>
+        <ThemedText type="smallBold" style={{ color: active ? theme.background : theme.text }}>
+          {chip.label}
+        </ThemedText>
+      </Pressable>
+    );
+  });
+
+  return wrap ? (
+    <View role="tablist" aria-label="Charts" style={[styles.chips, styles.wrappedChips]}>
+      {content}
+    </View>
+  ) : (
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
       role="tablist"
       aria-label="Charts"
       contentContainerStyle={styles.chips}>
-      {chips.map((chip) => {
-        const active = chip.section === selected;
-        return (
-          <Pressable
-            key={chip.section}
-            onPress={() => onSelect(chip.section)}
-            role="tab"
-            aria-selected={active}
-            style={({ pressed }) => [
-              styles.chip,
-              { backgroundColor: active ? theme.tint : theme.backgroundElement },
-              pressed && styles.pressed,
-            ]}>
-            <ThemedText type="smallBold" style={{ color: active ? theme.background : theme.text }}>
-              {chip.label}
-            </ThemedText>
-          </Pressable>
-        );
-      })}
+      {content}
     </ScrollView>
   );
 }
@@ -309,6 +331,7 @@ const styles = StyleSheet.create({
   },
   searchInput: { flex: 1, minHeight: 42, fontSize: 16 },
   chips: { gap: Spacing.two, paddingVertical: Spacing.two },
+  wrappedChips: { flexDirection: 'row', flexWrap: 'wrap' },
   chip: { paddingHorizontal: Spacing.three, paddingVertical: Spacing.two, borderRadius: Spacing.five },
   pressed: { opacity: 0.6 },
   loading: { marginVertical: Spacing.four },
