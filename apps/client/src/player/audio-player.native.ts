@@ -84,6 +84,10 @@ class NativeAudioPlayer implements AudioPlayer {
     this.player?.setPlaybackRate(this.rate, 'high');
   }
 
+  setVolume(volume: number) {
+    if (this.player && Number.isFinite(volume)) this.player.volume = Math.min(1, Math.max(0, volume));
+  }
+
   setSkipIntervals() {
     // expo-audio's lock screen seek buttons use the system's default intervals.
   }

@@ -1,11 +1,12 @@
 import { router } from 'expo-router';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Artwork } from '@/components/artwork';
 import { IconButton } from '@/components/icon';
 import { Scrubber } from '@/components/scrubber';
+import { SleepTimerButton, SleepTimerOptions } from '@/components/sleep-timer';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
@@ -23,6 +24,7 @@ export default function PlayerScreen() {
   const skipBackSec = usePlayer((s) => s.skipBackSec);
   const skipForwardSec = usePlayer((s) => s.skipForwardSec);
   const { togglePlay, skipBack, skipForward, cycleRate } = usePlayer.getState();
+  const [sleepOptionsOpen, setSleepOptionsOpen] = useState(false);
 
   // Nothing to show (e.g. a deep link to /player before anything played).
   useEffect(() => {
@@ -66,13 +68,17 @@ export default function PlayerScreen() {
           <IconButton name="skipForward" label={`Skip forward ${skipForwardSec} seconds`} size={30} onPress={skipForward} />
         </View>
 
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`Playback speed ${rate}x. Change speed`}
-          onPress={cycleRate}
-          style={({ pressed }) => [styles.rate, { backgroundColor: theme.backgroundElement }, pressed && styles.pressed]}>
-          <ThemedText type="smallBold">{`${rate}x`}</ThemedText>
-        </Pressable>
+        <View style={styles.secondary}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Playback speed ${rate}x. Change speed`}
+            onPress={cycleRate}
+            style={({ pressed }) => [styles.rate, { backgroundColor: theme.backgroundElement }, pressed && styles.pressed]}>
+            <ThemedText type="smallBold">{`${rate}x`}</ThemedText>
+          </Pressable>
+          <SleepTimerButton open={sleepOptionsOpen} onPress={() => setSleepOptionsOpen((open) => !open)} />
+        </View>
+        {sleepOptionsOpen && <SleepTimerOptions onChoose={() => setSleepOptionsOpen(false)} />}
 
         {error && (
           <ThemedText type="small" style={{ color: theme.danger }} accessibilityLiveRegion="polite">
@@ -92,6 +98,7 @@ const styles = StyleSheet.create({
   scrubber: { width: '100%', maxWidth: 480 },
   controls: { flexDirection: 'row', alignItems: 'center', gap: Spacing.five },
   playButton: { width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center' },
+  secondary: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: Spacing.three },
   rate: { minWidth: 64, minHeight: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', paddingHorizontal: Spacing.three },
   pressed: { opacity: 0.6 },
 });

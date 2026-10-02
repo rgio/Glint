@@ -15,6 +15,8 @@ const ICONS = {
   up: { ios: 'chevron.up', android: 'keyboard_arrow_up', web: 'keyboard_arrow_up' },
   down: { ios: 'chevron.down', android: 'keyboard_arrow_down', web: 'keyboard_arrow_down' },
   check: { ios: 'checkmark.circle.fill', android: 'check_circle', web: 'check_circle' },
+  checkOutline: { ios: 'checkmark.circle', android: 'radio_button_unchecked', web: 'radio_button_unchecked' },
+  sleep: { ios: 'moon.zzz', android: 'bedtime', web: 'bedtime' },
 } as const;
 
 export type IconName = keyof typeof ICONS;

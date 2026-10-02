@@ -6,6 +6,8 @@ import {
   mergeOnSignIn,
   NATIVE_MAX_RATE,
   shouldMarkPlayed,
+  sleepFadeVolume,
+  sleepTimerRemainingMs,
   sortKeyAfter,
   sortKeyBefore,
   sortKeyBetween,
@@ -29,6 +31,32 @@ describe('shouldMarkPlayed', () => {
   it('never marks when the duration is unknown', () => {
     expect(shouldMarkPlayed(500, null)).toBe(false);
     expect(shouldMarkPlayed(500, 0)).toBe(false);
+  });
+});
+
+describe('sleep timer', () => {
+  const at = { now: 1_000_000, positionSec: 600, durationSec: 1800, rate: 1 };
+
+  it('counts down a timed sleep timer on the wall clock', () => {
+    const timer = { kind: 'minutes' as const, minutes: 5, endsAt: 1_000_000 + 90_000 };
+    expect(sleepTimerRemainingMs(timer, at)).toBe(90_000);
+    expect(sleepTimerRemainingMs(timer, { ...at, now: 2_000_000 })).toBe(0);
+  });
+
+  it('counts what is left of the episode, faster at higher speeds', () => {
+    const timer = { kind: 'endOfEpisode' as const };
+    expect(sleepTimerRemainingMs(timer, at)).toBe(1_200_000);
+    expect(sleepTimerRemainingMs(timer, { ...at, rate: 2 })).toBe(600_000);
+    expect(sleepTimerRemainingMs(timer, { ...at, durationSec: null })).toBeNull();
+  });
+
+  it('fades linearly over the last 10 seconds', () => {
+    expect(sleepFadeVolume(null)).toBe(1);
+    expect(sleepFadeVolume(60_000)).toBe(1);
+    expect(sleepFadeVolume(10_000)).toBe(1);
+    expect(sleepFadeVolume(5_000)).toBe(0.5);
+    expect(sleepFadeVolume(0)).toBe(0);
+    expect(sleepFadeVolume(NaN)).toBe(1);
   });
 });
 

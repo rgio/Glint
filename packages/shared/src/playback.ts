@@ -19,3 +19,32 @@ export function shouldMarkPlayed(positionSec: number, durationSec: number | null
 
 /** F-08: how often to persist the position while playing. */
 export const POSITION_SAVE_INTERVAL_MS = 10_000;
+
+/** F-14: sleep timer lengths, in minutes. */
+export const SLEEP_TIMER_MINUTES = [5, 15, 30, 60] as const;
+/** F-14: the audio fades out over the last 10 s before the sleep timer stops it. */
+export const SLEEP_FADE_MS = 10_000;
+
+export type SleepTimer = { kind: 'minutes'; minutes: number; endsAt: number } | { kind: 'endOfEpisode' };
+
+/**
+ * Wall-clock milliseconds until a sleep timer stops playback, or null when that isn't known
+ * yet (end of episode with no duration). Playback speed shortens what's left of an episode.
+ */
+export function sleepTimerRemainingMs(
+  timer: SleepTimer,
+  { now, positionSec, durationSec, rate }: { now: number; positionSec: number; durationSec: number | null; rate: number },
+): number | null {
+  if (timer.kind === 'minutes') return Math.max(0, timer.endsAt - now);
+  if (!durationSec) return null;
+  return Math.max(0, ((durationSec - positionSec) / rate) * 1000);
+}
+
+/**
+ * Volume while a sleep timer runs: full until the last 10 s, then a linear fade to silence.
+ * Unknown or nonsensical input keeps full volume.
+ */
+export function sleepFadeVolume(remainingMs: number | null): number {
+  if (remainingMs === null || !Number.isFinite(remainingMs) || remainingMs >= SLEEP_FADE_MS) return 1;
+  return Math.max(0, remainingMs / SLEEP_FADE_MS);
+}

@@ -29,6 +29,8 @@ export interface AudioPlayer {
   pause(): void;
   seekTo(seconds: number): void;
   setRate(rate: number): void;
+  /** 0 to 1. Used by the sleep timer's fade-out. */
+  setVolume(volume: number): void;
   setSkipIntervals(backSec: number, forwardSec: number): void;
   onEvent(listener: (event: PlayerEvent) => void): () => void;
 }

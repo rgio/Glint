@@ -14,12 +14,12 @@ Checked against the code on 2026-10-01 (updated later that day after persistence
 | F-06 | Playback | 🟡 | Play, pause, seek, skip 15/30 s and speed presets work. Missing: configurable skip intervals in settings and 0.1 speed steps in the UI. Native speed is capped at 2.0x by expo-audio. |
 | F-07 | Queue | 🟡 | Play next, play last, auto-advance, remove, and move up/down buttons work. Missing: drag to reorder and swipe to remove. |
 | F-08 | Resume | 🟡 | Position is saved every 10 s, on pause, on seek and when the app is backgrounded, and persists across restarts. Missing: cross-device resume (needs sync). |
-| F-09 | Played state | 🟡 | Auto-mark at 95% or fewer than 30 s left works and persists. Missing: a manual mark played/unplayed control (`setPlayed` exists in the store but nothing in the UI calls it). |
+| F-09 | Played state | ✅ | Auto-mark at 95% or fewer than 30 s left, plus a mark played/unplayed button on every episode row; both persist. |
 | F-10 | Downloads (mobile) | ⬜ | Not started. Needs a `DownloadManager` interface and expo-file-system. |
 | F-11 | Home "New" section | 🟡 | Built in `(tabs)/index.tsx` from `lastHomeVisitAt`. Missing: the unplayed badge on the tab. |
 | F-12 | Accounts (optional, signed-out works) | ⬜ | No auth. The sign-in merge rule exists in `packages/shared` (`mergeOnSignIn`). |
 | F-13 | Sync (pull-based) | ⬜ | Merge rules and the `SyncChange` type exist in shared. Missing: outbox, `/v1/sync` endpoints and the SyncEngine. |
-| F-14 | Sleep timer | ⬜ | Not started. |
+| F-14 | Sleep timer | ✅ | 5/15/30/60 min or end of episode from the full player, with a live countdown and a fade over the last 10 s (`src/components/sleep-timer.tsx`, rules in `packages/shared`). End of episode stops instead of starting the next queued episode. The timer isn't persisted. iOS Safari ignores scripted volume, so there the fade is silent but the stop still works. Native not yet tested on a device. |
 | F-15 | Share episode link | ⬜ | Not started. Needs public web episode pages. |
 
 P1 and P2 items (F-16 to F-27) are not started, as planned. The feed parser already extracts `chaptersUrl` and `transcriptUrl` for F-16.
@@ -56,7 +56,7 @@ P1 and P2 items (F-16 to F-27) are not started, as planned. The feed parser alre
 4. ~~Add local persistence for the player and library stores.~~ Done (key-value; see above).
 5. ~~Postgres `CatalogStore` and a feed worker with adaptive polling.~~ Done; run it with `pnpm dev:worker`. WebSub is still to do.
 6. ~~Podcast Index integration for search (F-02) and trending (F-01).~~ Built; needs the key (step 2).
-7. Sleep timer (F-14), downloads (F-10) and OPML (F-03).
+7. ~~Sleep timer (F-14).~~ Done. Next: downloads (F-10) and OPML (F-03).
 8. Auth, then the sync outbox and `/v1/sync` (F-12, F-13).
 
 ## Open questions (from the spec)

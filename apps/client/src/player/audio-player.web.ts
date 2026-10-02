@@ -124,6 +124,11 @@ class WebAudioPlayer implements AudioPlayer {
     if (this.audio) this.audio.playbackRate = this.rate;
   }
 
+  setVolume(volume: number) {
+    // iOS Safari ignores this (volume is hardware-only there), so the fade is silent but the stop still works.
+    if (this.audio && Number.isFinite(volume)) this.audio.volume = Math.min(1, Math.max(0, volume));
+  }
+
   setSkipIntervals(backSec: number, forwardSec: number) {
     this.skipBackSec = backSec;
     this.skipForwardSec = forwardSec;

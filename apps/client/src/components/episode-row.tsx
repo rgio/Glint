@@ -27,7 +27,7 @@ export function EpisodeRow({ episode, podcast, showPodcast = false }: { episode:
   const saved = usePlayer((s) => s.saved[episode.id]);
   const isCurrent = usePlayer((s) => s.current?.id === episode.id);
   const playing = usePlayer((s) => s.playing && isCurrent);
-  const { playEpisode, togglePlay, playNext, playLast } = usePlayer.getState();
+  const { playEpisode, togglePlay, playNext, playLast, setPlayed } = usePlayer.getState();
 
   const playable = toPlayable(episode, podcast);
   const duration = episode.durationSec;
@@ -53,23 +53,32 @@ export function EpisodeRow({ episode, podcast, showPodcast = false }: { episode:
         <ThemedText type="small" themeColor="textSecondary" numberOfLines={2}>
           {htmlToText(episode.showNotesHtml)}
         </ThemedText>
-        <View style={styles.meta}>
-          {saved?.played && <Icon name="check" size={14} color={theme.textSecondary} />}
-          <ThemedText type="small" themeColor="textSecondary">
-            {saved?.played ? `Played · ${meta}` : meta}
-          </ThemedText>
+        <View style={styles.footer}>
+          <View style={styles.meta}>
+            {saved?.played && <Icon name="check" size={14} color={theme.textSecondary} />}
+            <ThemedText type="small" themeColor="textSecondary">
+              {saved?.played ? `Played · ${meta}` : meta}
+            </ThemedText>
+          </View>
+          <View style={styles.secondaryActions}>
+            <IconButton name="playNext" label="Play next" size={18} onPress={() => playNext(playable)} />
+            <IconButton name="playLast" label="Play last" size={18} onPress={() => playLast(playable)} />
+            <IconButton
+              name={saved?.played ? 'check' : 'checkOutline'}
+              label={saved?.played ? `Mark ${episode.title} unplayed` : `Mark ${episode.title} played`}
+              size={18}
+              color={saved?.played ? theme.tint : undefined}
+              onPress={() => setPlayed(episode.id, !saved?.played)}
+            />
+          </View>
         </View>
       </View>
-      <View style={styles.actions}>
-        <IconButton
-          name={playing ? 'pause' : 'play'}
-          label={playing ? `Pause ${episode.title}` : `Play ${episode.title}`}
-          color={theme.tint}
-          onPress={() => (isCurrent ? togglePlay() : playEpisode(playable))}
-        />
-        <IconButton name="playNext" label="Play next" size={18} onPress={() => playNext(playable)} />
-        <IconButton name="playLast" label="Play last" size={18} onPress={() => playLast(playable)} />
-      </View>
+      <IconButton
+        name={playing ? 'pause' : 'play'}
+        label={playing ? `Pause ${episode.title}` : `Play ${episode.title}`}
+        color={theme.tint}
+        onPress={() => (isCurrent ? togglePlay() : playEpisode(playable))}
+      />
     </View>
   );
 }
@@ -77,11 +86,14 @@ export function EpisodeRow({ episode, podcast, showPodcast = false }: { episode:
 const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
+    alignItems: 'center',
     gap: Spacing.two,
     paddingVertical: Spacing.three,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   text: { flex: 1, gap: Spacing.half },
-  meta: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one, marginTop: Spacing.one },
-  actions: { alignItems: 'center' },
+  footer: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' },
+  meta: { flexDirection: 'row', flexShrink: 1, alignItems: 'center', gap: Spacing.one },
+  // Right-aligned even when they wrap below a long meta line.
+  secondaryActions: { flexDirection: 'row', marginLeft: 'auto' },
 });
