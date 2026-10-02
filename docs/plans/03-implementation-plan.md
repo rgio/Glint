@@ -13,12 +13,14 @@ Build a thin vertical slice first: **add a feed by RSS URL, then browse it, play
 | `apps/client` | `@podcast/client` | Expo app (SDK 57, Expo Router, `src/` layout), iOS + Android + web |
 | `apps/api` | `@podcast/api` | Fastify REST API (TypeScript, run with `tsx`) |
 | `packages/shared` | `@podcast/shared` | Zod models, sync merge rules, playback rules, fractional queue keys |
+| `apps/feed-worker` | `@podcast/feed-worker` | Polls feeds on an adaptive schedule |
+| `packages/catalog` | `@podcast/catalog` | Feed fetching (SSRF guard), catalog stores (in-memory, Postgres + migrations), poll scheduling; shared by the API and the worker |
 | `packages/feed-parser` | `@podcast/feed-parser` | Lenient RSS parser on `fast-xml-parser` |
 
 - Workspace packages are consumed as TypeScript source (`main: src/index.ts`), with no build step.
 - `pnpm-workspace.yaml` allows the `esbuild` build script (`onlyBuiltDependencies`).
-- Root scripts: `pnpm dev:api`, `pnpm dev:client`, `pnpm test`, `pnpm typecheck`, `pnpm lint`. Turbo runs typecheck before test.
-- The spec's `apps/feed-worker` has **not** been created yet. Feed fetching currently happens inline in the API.
+- Root scripts: `pnpm dev:api`, `pnpm dev:worker`, `pnpm dev:client`, `pnpm test`, `pnpm typecheck`, `pnpm lint`. Turbo runs typecheck before test.
+- Feeds are fetched when first added (in the API) and then on a schedule by `apps/feed-worker`.
 
 ## Decisions that differ from the spec
 

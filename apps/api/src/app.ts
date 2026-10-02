@@ -1,13 +1,18 @@
 import cors from '@fastify/cors';
+import {
+  Catalog,
+  fetchFeed as defaultFetchFeed,
+  FeedFetchError,
+  InMemoryCatalogStore,
+  type CatalogStore,
+  type FetchFeed,
+} from '@podcast/catalog';
 import { FeedParseError } from '@podcast/feed-parser';
 import { ResolveFeedRequest } from '@podcast/shared';
 import Fastify from 'fastify';
 import { z } from 'zod';
 
-import { Catalog } from './catalog';
-import { fetchFeed as defaultFetchFeed, FeedFetchError, type FetchFeed } from './fetch-feed';
 import { DirectoryUnavailableError, type PodcastDirectory } from './podcast-index';
-import { InMemoryCatalogStore, type CatalogStore } from './store';
 
 export type AppDeps = {
   store?: CatalogStore;

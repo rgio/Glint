@@ -1,11 +1,10 @@
 import { existsSync } from 'node:fs';
 
+import { migrate, PostgresCatalogStore } from '@podcast/catalog';
 import postgres from 'postgres';
 
 import { buildApp } from './app';
-import { migrate } from './db/migrate';
 import { PodcastIndexDirectory } from './podcast-index';
-import { PostgresCatalogStore } from './postgres-store';
 
 // Local secrets (see .env.example). Real deployments set the environment directly.
 if (existsSync('.env')) process.loadEnvFile('.env');

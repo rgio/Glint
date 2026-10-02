@@ -8,7 +8,8 @@ import { migrate } from '../src/db/migrate';
 import { PostgresCatalogStore } from '../src/postgres-store';
 import { InMemoryCatalogStore, type CatalogStore } from '../src/store';
 
-// The Postgres suite runs when TEST_DATABASE_URL is set (see .env.example), and is skipped otherwise.
+// The Postgres suite runs when TEST_DATABASE_URL is set (see this package's .env.example), and is
+// skipped otherwise.
 const envFile = new URL('../.env', import.meta.url);
 if (existsSync(envFile)) process.loadEnvFile(envFile);
 const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL;
@@ -27,6 +28,8 @@ const podcast: Podcast = {
 };
 
 const noCache = { etag: null, lastModified: null, fetchedAt: null };
+/** ISO time `hours` (may be fractional) into 2 Oct 2026, UTC. */
+const at = (hours: number) => new Date(Date.UTC(2026, 9, 2) + hours * 3_600_000).toISOString();
 
 const episode = (id: string, publishedAt: string | null, extra: Partial<Episode> = {}): Episode => ({
   id,
@@ -122,6 +125,42 @@ function catalogStoreContract(makeStore: () => Promise<CatalogStore>) {
     expect(await store.listEpisodes('pod_missing', { offset: 0, limit: 10, sort: 'newest' })).toEqual([]);
   });
 
+  it('claims due feeds: never polled first, then most overdue, up to the limit', async () => {
+    for (const id of ['pod_a', 'pod_b', 'pod_c', 'pod_d']) {
+      await store.upsertPodcast({ ...podcast, id, feedUrl: `https://example.com/${id}.xml` }, noCache);
+    }
+    await store.recordPoll('pod_a', { nextPollAt: at(11), failures: 0 }); // due an hour ago
+    await store.recordPoll('pod_b', { nextPollAt: at(9), failures: 2 }); // most overdue
+    await store.recordPoll('pod_c', { nextPollAt: at(13), failures: 0 }); // not due yet
+    // pod_d was never polled.
+
+    const first = await store.claimDueFeeds({ now: at(12), leaseUntil: at(12.5), limit: 2 });
+    expect(first).toEqual([
+      { id: 'pod_b', feedUrl: 'https://example.com/pod_b.xml', pollFailures: 2 },
+      { id: 'pod_d', feedUrl: 'https://example.com/pod_d.xml', pollFailures: 0 },
+    ]);
+    // Claimed feeds are leased; the next claim gets the rest of what's due.
+    expect((await store.claimDueFeeds({ now: at(12), leaseUntil: at(12.5), limit: 10 })).map((f) => f.id)).toEqual([
+      'pod_a',
+    ]);
+    expect(await store.claimDueFeeds({ now: at(12), leaseUntil: at(12.5), limit: 10 })).toEqual([]);
+    // Once the lease runs out, unrecorded claims come back.
+    expect(
+      (await store.claimDueFeeds({ now: at(12.5), leaseUntil: at(13), limit: 10 })).map((f) => f.id),
+    ).toEqual(['pod_a', 'pod_b', 'pod_d']);
+  });
+
+  it('records the next poll and failure count', async () => {
+    await store.upsertPodcast(podcast, noCache);
+    await store.recordPoll('pod_1', { nextPollAt: at(14), failures: 3 });
+    expect(await store.claimDueFeeds({ now: at(13), leaseUntil: at(13.5), limit: 10 })).toEqual([]);
+    expect(await store.claimDueFeeds({ now: at(14), leaseUntil: at(14.5), limit: 10 })).toEqual([
+      { id: 'pod_1', feedUrl: podcast.feedUrl, pollFailures: 3 },
+    ]);
+    // Recording for a podcast that doesn't exist is a no-op.
+    await store.recordPoll('pod_missing', { nextPollAt: at(14), failures: 0 });
+  });
+
   it('handles a feed with thousands of episodes', async () => {
     await store.upsertPodcast(podcast, noCache);
     const many = Array.from({ length: 2500 }, (_, i) =>
@@ -147,6 +186,23 @@ describe.skipIf(!TEST_DATABASE_URL)('PostgresCatalogStore', () => {
     await migrate(sql);
     await sql`truncate podcasts cascade`;
     return new PostgresCatalogStore(sql);
+  });
+
+  it('concurrent claims never hand out the same feed', async () => {
+    await migrate(sql);
+    await sql`truncate podcasts cascade`;
+    const store = new PostgresCatalogStore(sql);
+    for (let i = 0; i < 40; i++) {
+      await store.upsertPodcast({ ...podcast, id: `pod_${i}`, feedUrl: `https://example.com/${i}.xml` }, noCache);
+    }
+    const now = new Date().toISOString();
+    const leaseUntil = new Date(Date.now() + 600_000).toISOString();
+    const batches = await Promise.all(
+      Array.from({ length: 4 }, () => store.claimDueFeeds({ now, leaseUntil, limit: 15 })),
+    );
+    const ids = batches.flat().map((f) => f.id);
+    expect(ids).toHaveLength(40);
+    expect(new Set(ids).size).toBe(40);
   });
 
   it('migrations are idempotent', async () => {

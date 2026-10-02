@@ -1,7 +1,7 @@
 import type { Episode, Podcast } from '@podcast/shared';
 import type { Sql } from 'postgres';
 
-import type { CatalogStore, FeedCacheInfo } from './store';
+import type { CatalogStore, DueFeed, FeedCacheInfo } from './store';
 
 // Postgres caps a statement at 65,535 parameters; 14 columns per episode keeps a batch well under.
 const EPISODE_BATCH = 1000;
@@ -156,5 +156,27 @@ export class PostgresCatalogStore implements CatalogStore {
       from episodes where podcast_id = ${podcastId}
       order by ${order} limit ${limit} offset ${offset}`;
     return rows.map(toEpisode);
+  }
+
+  async claimDueFeeds({ now, leaseUntil, limit }: { now: string; leaseUntil: string; limit: number }) {
+    // `skip locked` lets concurrent workers claim disjoint batches without waiting on each other.
+    const rows = await this.sql<{ id: string; feed_url: string; poll_failures: number }[]>`
+      update podcasts set next_poll_at = ${leaseUntil}
+      where id in (
+        select id from podcasts
+        where next_poll_at is null or next_poll_at <= ${now}
+        order by next_poll_at nulls first, id collate "C"
+        limit ${limit}
+        for update skip locked
+      )
+      returning id, feed_url, poll_failures`;
+    return rows
+      .map((r): DueFeed => ({ id: r.id, feedUrl: r.feed_url, pollFailures: r.poll_failures }))
+      .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  }
+
+  async recordPoll(podcastId: string, { nextPollAt, failures }: { nextPollAt: string; failures: number }) {
+    await this.sql`
+      update podcasts set next_poll_at = ${nextPollAt}, poll_failures = ${failures} where id = ${podcastId}`;
   }
 }

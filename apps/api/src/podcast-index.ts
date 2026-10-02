@@ -1,8 +1,7 @@
 import { createHash } from 'node:crypto';
 
+import { USER_AGENT } from '@podcast/catalog';
 import type { Category, DirectoryPodcast } from '@podcast/shared';
-
-import { USER_AGENT } from './fetch-feed';
 
 /** Search and charts (F-01, F-02). Podcast Index backs it; tests use a fake. */
 export interface PodcastDirectory {

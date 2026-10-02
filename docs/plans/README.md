@@ -20,6 +20,7 @@ pnpm install
 cp apps/api/.env.example apps/api/.env   # add a Podcast Index key to turn on search and charts
 createdb podcast && createdb podcast_test # catalog database, and one the tests wipe
 pnpm dev:api        # Fastify on :4000
+pnpm dev:worker     # polls feeds for new episodes
 pnpm dev:client     # Expo; press w for web, i for iOS, a for Android
 pnpm test && pnpm typecheck
 ```
