@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { buildApp } from '../src/app';
 import { isPrivateAddress, type FetchFeed } from '../src/fetch-feed';
+import { DirectoryUnavailableError, type PodcastDirectory } from '../src/podcast-index';
 
 const xml = readFileSync(
   new URL('../../../packages/feed-parser/test/fixtures/sample.xml', import.meta.url),
@@ -81,6 +82,75 @@ describe('GET /v1/podcasts/:id/episodes', () => {
   it('returns 404 for an unknown podcast', async () => {
     const { app } = setup();
     expect((await app.inject({ url: '/v1/podcasts/pod_missing/episodes' })).statusCode).toBe(404);
+  });
+});
+
+describe('search and discover', () => {
+  const show = {
+    feedUrl: 'https://feeds.example.com/show.xml',
+    title: 'Example Show',
+    author: null,
+    description: null,
+    artworkUrl: null,
+    categories: [],
+    language: 'en',
+  };
+
+  function withDirectory(overrides: Partial<PodcastDirectory> = {}) {
+    const directory = {
+      search: vi.fn<PodcastDirectory['search']>(async () => [show]),
+      trending: vi.fn<PodcastDirectory['trending']>(async () => [show]),
+      categories: vi.fn<PodcastDirectory['categories']>(async () => [{ id: 55, name: 'News' }]),
+      ...overrides,
+    };
+    return { app: buildApp({ directory }), directory };
+  }
+
+  it('searches by term', async () => {
+    const { app, directory } = withDirectory();
+    const res = await app.inject({ url: '/v1/search?q=%20example%20&limit=5' });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ results: [show] });
+    expect(directory.search).toHaveBeenCalledWith('example', 5);
+  });
+
+  it('rejects an empty search', async () => {
+    const { app } = withDirectory();
+    expect((await app.inject({ url: '/v1/search?q=%20' })).statusCode).toBe(400);
+  });
+
+  it('serves top charts and category charts', async () => {
+    const { app, directory } = withDirectory();
+    expect((await app.inject({ url: '/v1/discover' })).json()).toEqual({ section: 'top', results: [show] });
+    expect(directory.trending).toHaveBeenLastCalledWith({ limit: 25, categoryId: undefined, language: undefined });
+
+    await app.inject({ url: '/v1/discover?section=category:55&lang=en&limit=10' });
+    expect(directory.trending).toHaveBeenLastCalledWith({ limit: 10, categoryId: 55, language: 'en' });
+
+    expect((await app.inject({ url: '/v1/discover?section=editors' })).statusCode).toBe(400);
+  });
+
+  it('lists categories', async () => {
+    const { app } = withDirectory();
+    expect((await app.inject({ url: '/v1/discover/categories' })).json()).toEqual({
+      categories: [{ id: 55, name: 'News' }],
+    });
+  });
+
+  it('answers 503, saying whether the directory is missing or failing', async () => {
+    const { app } = setup();
+    const res = await app.inject({ url: '/v1/search?q=example' });
+    expect(res.statusCode).toBe(503);
+    expect(res.json().error).toBe('directory_not_configured');
+
+    const failing = withDirectory({
+      trending: async () => {
+        throw new DirectoryUnavailableError('Podcast Index answered 500');
+      },
+    });
+    const down = await failing.app.inject({ url: '/v1/discover' });
+    expect(down.statusCode).toBe(503);
+    expect(down.json().error).toBe('directory_unavailable');
   });
 });
 

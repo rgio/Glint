@@ -1,4 +1,4 @@
-import type { Episode, Podcast } from '@podcast/shared';
+import type { Category, DirectoryPodcast, Episode, Podcast } from '@podcast/shared';
 import { Platform } from 'react-native';
 
 // Android emulators reach the host machine at 10.0.2.2, not localhost.
@@ -45,4 +45,19 @@ export const api = {
     request<{ episodes: Episode[]; nextCursor: string | null }>(
       `/v1/podcasts/${encodeURIComponent(id)}/episodes?limit=${limit}${cursor ? `&cursor=${cursor}` : ''}`,
     ),
+
+  search: (q: string, limit = 25) =>
+    request<{ results: DirectoryPodcast[] }>(`/v1/search?q=${encodeURIComponent(q)}&limit=${limit}`),
+
+  /** `section` is `top` or `category:<id>`. */
+  discover: (section: string, limit = 25) =>
+    request<{ section: string; results: DirectoryPodcast[] }>(
+      `/v1/discover?section=${encodeURIComponent(section)}&limit=${limit}`,
+    ),
+
+  categories: () => request<{ categories: Category[] }>('/v1/discover/categories'),
 };
+
+/** Search and charts are optional: a server without a Podcast Index key answers this. */
+export const isDirectoryNotConfigured = (err: unknown) =>
+  err instanceof ApiError && err.code === 'directory_not_configured';

@@ -11,12 +11,13 @@ Everything planned and decided in the 2026-10-01 Claude Code session that specce
 
 ## Where things stand
 
-A local vertical slice works: paste an RSS URL, open the show, play, queue and resume, on iOS, Android and web from one codebase, against an in-memory Fastify API. Nothing is persisted yet, and accounts, sync, search, discovery, downloads and the sleep timer are not started. See [04-status-and-todos.md](04-status-and-todos.md).
+A local vertical slice works: search or browse charts (with a Podcast Index key) or paste an RSS URL, open the show, play, queue and resume, on iOS, Android and web from one codebase, against an in-memory Fastify API. Subscriptions, queue and positions persist on the device. Accounts, sync, downloads and the sleep timer are not started. See [04-status-and-todos.md](04-status-and-todos.md).
 
 ## Run it
 
 ```sh
 pnpm install
+cp apps/api/.env.example apps/api/.env   # add a Podcast Index key to turn on search and charts
 pnpm dev:api        # Fastify on :4000
 pnpm dev:client     # Expo; press w for web, i for iOS, a for Android
 pnpm test && pnpm typecheck

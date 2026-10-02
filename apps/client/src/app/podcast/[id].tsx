@@ -87,7 +87,7 @@ function Header({ podcast, latest }: { podcast: Podcast; latest: ReturnType<type
         <Button
           title={subscribed ? 'Subscribed' : 'Subscribe'}
           variant={subscribed ? 'secondary' : 'primary'}
-          accessibilityState={{ selected: subscribed }}
+          aria-selected={subscribed}
           onPress={() => toggleSubscription(podcast)}
           style={styles.grow}
         />

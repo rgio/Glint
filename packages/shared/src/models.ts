@@ -33,6 +33,23 @@ export const Episode = z.object({
 });
 export type Episode = z.infer<typeof Episode>;
 
+// Directory entries: shows found through search or charts (F-01, F-02). They
+// may not be in our catalog yet; resolving the feed URL adds them.
+
+export const DirectoryPodcast = z.object({
+  feedUrl: z.url(),
+  title: z.string(),
+  author: z.string().nullable(),
+  description: z.string().nullable(),
+  artworkUrl: z.url().nullable(),
+  categories: z.array(z.string()),
+  language: z.string().nullable(),
+});
+export type DirectoryPodcast = z.infer<typeof DirectoryPodcast>;
+
+export const Category = z.object({ id: z.number().int(), name: z.string() });
+export type Category = z.infer<typeof Category>;
+
 // Per-user state: synced across devices. `updatedAt` is the client clock in
 // epoch milliseconds when the change was made.
 

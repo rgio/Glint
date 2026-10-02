@@ -26,7 +26,7 @@ Build a thin vertical slice first: **add a feed by RSS URL, then browse it, play
 | --- | --- | --- |
 | `react-native-track-player` for native audio | **`expo-audio`** (first-party Expo module, with background playback and lock-screen controls via `setActiveForLockScreen`) | Inferred from the session's checks of library versions and release recency; the session didn't state a reason. Consequence: native speed is capped at **2.0x** (`NATIVE_MAX_RATE`). Web supports up to 3.0x. Revisit if 3x on mobile or richer remote commands matter. |
 | Interface `setQueue`, `onEvent(...)` | `AudioPlayer` has `load / play / pause / seekTo / setRate / setSkipIntervals / onEvent`, plus `maxRate`. The queue lives in the Zustand store, not the player. | Simpler, and keeps queue logic shared across platforms. |
-| SQLite (expo-sqlite + Drizzle) / IndexedDB local DB | **None yet.** Player and library state are in-memory Zustand stores. | Subscriptions, queue and positions are lost on reload. This is the first big gap. |
+| SQLite (expo-sqlite + Drizzle) / IndexedDB local DB | Zustand `persist` over a key-value store (`expo-sqlite/kv-store` on native, IndexedDB on web) | Simpler than a relational schema while all state is per-device. Revisit for the sync outbox. |
 | Postgres + Redis | `CatalogStore` interface with an `InMemoryCatalogStore` | The Postgres implementation is meant to satisfy the same interface. |
 | Mini player / tabs | NativeTabs (`expo-router/unstable-native-tabs`) on native; custom `expo-router/ui` tabs plus a bottom web player bar on web | |
 | Icons | `expo-symbols` `SymbolView`: SF Symbols on iOS, Material Symbols on Android and web | |
