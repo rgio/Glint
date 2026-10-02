@@ -20,6 +20,7 @@ export interface CatalogStore {
   findPodcastByFeedUrl(feedUrl: string): Promise<Podcast | null>;
   upsertPodcast(podcast: Podcast, cache: FeedCacheInfo): Promise<void>;
   getFeedCache(podcastId: string): Promise<FeedCacheInfo | null>;
+  findEpisodeById(id: string): Promise<Episode | null>;
   /** Inserts new episodes and updates changed ones, matched by id. */
   upsertEpisodes(episodes: Episode[]): Promise<void>;
   listEpisodes(
@@ -61,6 +62,10 @@ export class InMemoryCatalogStore implements CatalogStore {
 
   async getFeedCache(podcastId: string) {
     return this.cache.get(podcastId) ?? null;
+  }
+
+  async findEpisodeById(id: string) {
+    return this.episodes.get(id) ?? null;
   }
 
   async upsertEpisodes(episodes: Episode[]) {

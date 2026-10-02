@@ -1,9 +1,7 @@
-import { useQueries } from '@tanstack/react-query';
 import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
-import { api } from '@/api/client';
 import { Artwork } from '@/components/artwork';
 import { Button } from '@/components/button';
 import { EpisodeRow } from '@/components/episode-row';
@@ -12,43 +10,23 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { formatDuration } from '@/lib/format';
+import { useNewEpisodes } from '@/library/new-episodes';
 import { useLibrary } from '@/library/store';
 import { usePlayer } from '@/player/store';
 
-const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
-const MAX_NEW = 20;
-
 export default function HomeScreen() {
-  const subscriptions = useLibrary((s) => s.subscriptions);
-  const lastVisit = useLibrary((s) => s.lastHomeVisitAt);
-  const [now] = useState(Date.now);
-
   // Remember when the listener left Home, so next time "New" only shows what arrived since.
   useFocusEffect(useCallback(() => () => useLibrary.getState().markHomeVisited(), []));
 
-  const subs = Object.values(subscriptions);
-  const results = useQueries({
-    queries: subs.map(({ podcast }) => ({
-      queryKey: ['episodes', podcast.id, 'latest'],
-      queryFn: () => api.listEpisodes(podcast.id, null, 10),
-    })),
-  });
-
-  // F-11: "New" replaces push notifications in v1. First visit falls back to the past week.
-  const since = lastVisit || now - WEEK_MS;
-  const fresh = results
-    .flatMap((r, i) => (r.data?.episodes ?? []).map((episode) => ({ episode, podcast: subs[i]!.podcast })))
-    .filter(({ episode }) => episode.publishedAt && Date.parse(episode.publishedAt) > since)
-    .sort((a, b) => (b.episode.publishedAt ?? '').localeCompare(a.episode.publishedAt ?? ''))
-    .slice(0, MAX_NEW);
-  const loading = results.some((r) => r.isPending);
+  // F-11: "New" replaces push notifications in v1.
+  const { listed: fresh, loading, subscribed } = useNewEpisodes();
 
   return (
     <TabScreen title="Home">
       <ContinueListening />
 
       <SectionTitle>New</SectionTitle>
-      {subs.length === 0 ? (
+      {!subscribed ? (
         <EmptyState title="Nothing here yet" body="Subscribe to shows and their new episodes will show up here.">
           <Button title="Find a show" variant="secondary" onPress={() => router.navigate('/discover')} />
         </EmptyState>

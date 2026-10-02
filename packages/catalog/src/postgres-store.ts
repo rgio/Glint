@@ -64,6 +64,9 @@ const toEpisode = (r: EpisodeRow): Episode => ({
   episodeNumber: r.episode_number,
 });
 
+const EPISODE_COLUMNS = `id, podcast_id, guid, title, published_at, duration_sec, enclosure_url, enclosure_type,
+  enclosure_bytes, show_notes_html, artwork_url, season, episode_number`;
+
 const PODCAST_COLUMNS = `id, feed_url, title, author, description, artwork_url, language, categories, explicit,
   last_published_at`;
 
@@ -111,6 +114,12 @@ export class PostgresCatalogStore implements CatalogStore {
       : null;
   }
 
+  async findEpisodeById(id: string) {
+    const [row] = await this.sql<EpisodeRow[]>`
+      select ${this.sql.unsafe(EPISODE_COLUMNS)} from episodes where id = ${id}`;
+    return row ? toEpisode(row) : null;
+  }
+
   async upsertEpisodes(episodes: Episode[]) {
     for (let i = 0; i < episodes.length; i += EPISODE_BATCH) {
       const rows = episodes.slice(i, i + EPISODE_BATCH).map((e) => ({
@@ -151,8 +160,7 @@ export class PostgresCatalogStore implements CatalogStore {
         ? this.sql`published_at desc nulls last, id collate "C"`
         : this.sql`published_at asc nulls first, id collate "C"`;
     const rows = await this.sql<EpisodeRow[]>`
-      select id, podcast_id, guid, title, published_at, duration_sec, enclosure_url, enclosure_type,
-        enclosure_bytes, show_notes_html, artwork_url, season, episode_number
+      select ${this.sql.unsafe(EPISODE_COLUMNS)}
       from episodes where podcast_id = ${podcastId}
       order by ${order} limit ${limit} offset ${offset}`;
     return rows.map(toEpisode);

@@ -7,6 +7,8 @@ import { useLibrary } from '@/library/store';
 const DEFAULT_API_URL = Platform.OS === 'android' ? 'http://10.0.2.2:4000' : 'http://localhost:4000';
 export const API_URL = process.env.EXPO_PUBLIC_API_URL ?? DEFAULT_API_URL;
 
+export type EpisodeSort = 'newest' | 'oldest';
+
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -73,12 +75,15 @@ export const api = {
   getPodcast: (id: string) =>
     withReadd(id, () => request<{ podcast: Podcast }>(`/v1/podcasts/${encodeURIComponent(id)}`)).then(remember),
 
-  listEpisodes: (id: string, cursor: string | null, limit = 50) =>
+  listEpisodes: (id: string, cursor: string | null, limit = 50, sort: EpisodeSort = 'newest') =>
     withReadd(id, () =>
       request<{ episodes: Episode[]; nextCursor: string | null }>(
-        `/v1/podcasts/${encodeURIComponent(id)}/episodes?limit=${limit}${cursor ? `&cursor=${cursor}` : ''}`,
+        `/v1/podcasts/${encodeURIComponent(id)}/episodes?limit=${limit}&sort=${sort}${cursor ? `&cursor=${cursor}` : ''}`,
       ),
     ),
+
+  getEpisode: (id: string) =>
+    request<{ episode: Episode; podcast: Podcast }>(`/v1/episodes/${encodeURIComponent(id)}`),
 
   search: (q: string, limit = 25) =>
     request<{ results: DirectoryPodcast[] }>(`/v1/search?q=${encodeURIComponent(q)}&limit=${limit}`),

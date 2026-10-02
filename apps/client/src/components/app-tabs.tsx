@@ -1,9 +1,11 @@
+import { usePathname } from 'expo-router';
 import { NativeTabs } from 'expo-router/unstable-native-tabs';
 import { Platform, StyleSheet, useColorScheme, View } from 'react-native';
 
 import { MiniPlayer } from './mini-player';
 
 import { BottomTabInset, Colors } from '@/constants/theme';
+import { badgeText, useUnplayedNewCount } from '@/library/new-episodes';
 import { usePlayer } from '@/player/store';
 
 function AccessoryPlayer() {
@@ -15,6 +17,9 @@ export default function AppTabs() {
   const scheme = useColorScheme();
   const colors = Colors[scheme === 'unspecified' ? 'light' : scheme];
   const hasEpisode = usePlayer((s) => s.current !== null);
+  // F-11: new, unplayed episodes, shown on the Home tab while another tab is open.
+  const homeBadge = badgeText(useUnplayedNewCount());
+  const onHome = usePathname() === '/';
 
   return (
     <View style={styles.fill}>
@@ -25,6 +30,7 @@ export default function AppTabs() {
         <NativeTabs.Trigger name="index">
           <NativeTabs.Trigger.Label>Home</NativeTabs.Trigger.Label>
           <NativeTabs.Trigger.Icon sf="house.fill" md="home" />
+          <NativeTabs.Trigger.Badge hidden={!homeBadge || onHome}>{homeBadge}</NativeTabs.Trigger.Badge>
         </NativeTabs.Trigger>
         <NativeTabs.Trigger name="discover">
           <NativeTabs.Trigger.Label>Discover</NativeTabs.Trigger.Label>

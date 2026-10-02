@@ -45,6 +45,8 @@ type PlayerState = {
   sleepRemainingSec: number | null;
 
   playEpisode(episode: PlayableEpisode): Promise<void>;
+  /** F-05 timestamps: plays `episode` from `seconds`, seeking if it's already loaded. */
+  playFrom(episode: PlayableEpisode, seconds: number): void;
   togglePlay(): void;
   seekTo(seconds: number): void;
   skipBack(): void;
@@ -199,6 +201,18 @@ export const usePlayer = create<PlayerState>()(
           } catch (err) {
             set({ error: (err as Error).message, buffering: false });
           }
+        },
+
+        playFrom(episode, seconds) {
+          const { current, loaded, playing } = get();
+          if (current?.id === episode.id && loaded) {
+            get().seekTo(seconds);
+            if (!playing) audioPlayer.play();
+            return;
+          }
+          // playEpisode resumes from the saved position, so start there.
+          save(episode.id, { positionSec: seconds, played: false });
+          void get().playEpisode(episode);
         },
 
         togglePlay() {

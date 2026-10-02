@@ -9,14 +9,14 @@ Checked against the code on 2026-10-01 (updated later that day after persistence
 | F-01 | Discovery (Podcast Index trending + categories) | 🟡 | `GET /v1/discover?section=top\|category:<id>` and `/v1/discover/categories` (`apps/api/src/podcast-index.ts`), and a Trending list with category chips on Discover, filtered to the device language (`src/lib/locale.ts`). Verified against the live Podcast Index API. Missing: region filtering. Note that Podcast Index "trending" ranks recent activity, not popularity, so the Top list skews toward small, recently active shows. |
 | F-02 | Search | 🟡 | `GET /v1/search?q=` (Podcast Index `search/byterm`, cached 10 min) and a debounced search box on Discover. Shows only: Podcast Index has no full-text episode search, so `type=episode` from the spec isn't built. Search has no language filter upstream. Verified against the live API. |
 | F-03 | Subscribe (search, show page, RSS URL) + OPML | 🟡 | Add by RSS URL and from search or charts works (`POST /v1/podcasts/resolve`), and subscribe/unsubscribe works and persists (`library/store.ts`). Missing: OPML import/export. |
-| F-04 | Show page | 🟡 | `podcast/[id].tsx` has artwork, paged episodes and "Play latest". Missing: a sort toggle in the UI (the API supports it) and season grouping. |
-| F-05 | Episode page / show notes | 🟡 | Episode rows show notes as plain text (`htmlToText`). Missing: an `/episode/[id]` route, sanitized HTML rendering, and tappable timestamps. |
+| F-04 | Show page | ✅ | Artwork, paged episodes, a Newest/Oldest sort, "Season N" headings for shows with two or more seasons, and "Play latest" (always the newest, whatever the sort). |
+| F-05 | Episode page / show notes | ✅ | `/episode/[id]` (via `GET /v1/episodes/:id`), opened from any episode row. Show notes are parsed with htmlparser2 into a safe subset (text, emphasis, http/https/mailto links, headings, quotes, lists) and rendered natively (`src/lib/show-notes.ts`, unit-tested); timestamps within the episode's length play from that point. Images aren't shown. |
 | F-06 | Playback | 🟡 | Play, pause, seek, skip 15/30 s and speed presets work. Missing: configurable skip intervals in settings and 0.1 speed steps in the UI. Native speed is capped at 2.0x by expo-audio. |
 | F-07 | Queue | 🟡 | Play next, play last, auto-advance, remove, and move up/down buttons work. Missing: drag to reorder and swipe to remove. |
 | F-08 | Resume | 🟡 | Position is saved every 10 s, on pause, on seek and when the app is backgrounded, and persists across restarts. Missing: cross-device resume (needs sync). |
 | F-09 | Played state | ✅ | Auto-mark at 95% or fewer than 30 s left, plus a mark played/unplayed button on every episode row; both persist. |
 | F-10 | Downloads (mobile) | ⬜ | Not started. Needs a `DownloadManager` interface and expo-file-system. |
-| F-11 | Home "New" section | 🟡 | Built in `(tabs)/index.tsx` from `lastHomeVisitAt`. Missing: the unplayed badge on the tab. |
+| F-11 | Home "New" section | ✅ | New episodes since the last visit, and a badge on the Home tab (web and native) counting the unplayed ones, hidden while Home is open. Subscriptions are re-checked every 15 min while the app is open. |
 | F-12 | Accounts (optional, signed-out works) | ⬜ | No auth. The sign-in merge rule exists in `packages/shared` (`mergeOnSignIn`). |
 | F-13 | Sync (pull-based) | ⬜ | Merge rules and the `SyncChange` type exist in shared. Missing: outbox, `/v1/sync` endpoints and the SyncEngine. |
 | F-14 | Sleep timer | ✅ | 5/15/30/60 min or end of episode from the full player, with a live countdown and a fade over the last 10 s (`src/components/sleep-timer.tsx`, rules in `packages/shared`). End of episode stops instead of starting the next queued episode. The timer isn't persisted. iOS Safari ignores scripted volume, so there the fade is silent but the stop still works. Native not yet tested on a device. |
@@ -41,7 +41,7 @@ P1 and P2 items (F-16 to F-27) are not started, as planned. The feed parser alre
 | Settings screen, onboarding, `/episode/[id]` route | ⬜ | Spec routes not yet built |
 | Wide-screen layout (sidebar + right-hand player at >1024 px) | ⬜ | |
 | i18n (i18next, EN + ES), web keyboard shortcuts | ⬜ | |
-| Component tests, Maestro, Playwright E2E | ⬜ | Web flows (persistence, seeking, tab bar, Discover) were checked with throwaway headless-browser scripts, not a committed suite |
+| Component tests, Maestro, Playwright E2E | 🟡 | The client now runs vitest for plain logic modules (`pnpm test`). Web flows were checked with throwaway headless-browser scripts, not a committed suite |
 | CI (lint, typecheck, tests, EAS preview builds) | ⬜ | |
 | Sentry, analytics | ⬜ | |
 | Git repo at `podcast-app/` | ✅ | The nested `apps/client/.git` was removed and the client committed into the main repo (`17a1a8f`). |

@@ -103,6 +103,8 @@ function catalogStoreContract(makeStore: () => Promise<CatalogStore>) {
 
     const all = await store.listEpisodes('pod_1', { offset: 0, limit: 10, sort: 'newest' });
     expect(all).toEqual([{ ...first, title: 'Edited' }, bare]);
+    expect(await store.findEpisodeById('ep_b')).toEqual(bare);
+    expect(await store.findEpisodeById('ep_missing')).toBeNull();
   });
 
   it('pages newest and oldest first, with undated episodes at the end of newest', async () => {

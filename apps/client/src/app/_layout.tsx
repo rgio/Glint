@@ -22,6 +22,7 @@ export default function RootLayout() {
         <Stack>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="podcast/[id]" options={{ title: '', headerBackTitle: 'Back' }} />
+          <Stack.Screen name="episode/[id]" options={{ title: '', headerBackTitle: 'Back' }} />
           <Stack.Screen name="player" options={{ presentation: 'modal', title: 'Now Playing' }} />
         </Stack>
         <WebPlayerBar />

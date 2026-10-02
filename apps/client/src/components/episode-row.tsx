@@ -1,5 +1,7 @@
 import type { Episode, Podcast } from '@podcast/shared';
-import { StyleSheet, View } from 'react-native';
+import { useQueryClient } from '@tanstack/react-query';
+import { router } from 'expo-router';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Icon, IconButton } from './icon';
 import { ThemedText } from './themed-text';
@@ -28,6 +30,13 @@ export function EpisodeRow({ episode, podcast, showPodcast = false }: { episode:
   const isCurrent = usePlayer((s) => s.current?.id === episode.id);
   const playing = usePlayer((s) => s.playing && isCurrent);
   const { playEpisode, togglePlay, playNext, playLast, setPlayed } = usePlayer.getState();
+  const queryClient = useQueryClient();
+
+  const openDetails = () => {
+    // The row already has everything the episode page shows first.
+    queryClient.setQueryData(['episode', episode.id], { episode, podcast });
+    router.push({ pathname: '/episode/[id]', params: { id: episode.id } });
+  };
 
   const playable = toPlayable(episode, podcast);
   const duration = episode.durationSec;
@@ -42,17 +51,24 @@ export function EpisodeRow({ episode, podcast, showPodcast = false }: { episode:
   return (
     <View style={[styles.row, { borderBottomColor: theme.border }]}>
       <View style={styles.text}>
-        {showPodcast && (
-          <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
-            {podcast.title}
+        {/* Separate from the action buttons below, so they aren't nested inside a link. */}
+        <Pressable
+          accessibilityRole="link"
+          accessibilityLabel={`${episode.title}. Episode details`}
+          onPress={openDetails}
+          style={({ pressed }) => [styles.details, pressed && styles.pressed]}>
+          {showPodcast && (
+            <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
+              {podcast.title}
+            </ThemedText>
+          )}
+          <ThemedText type="smallBold" numberOfLines={2}>
+            {episode.title}
           </ThemedText>
-        )}
-        <ThemedText type="smallBold" numberOfLines={2}>
-          {episode.title}
-        </ThemedText>
-        <ThemedText type="small" themeColor="textSecondary" numberOfLines={2}>
-          {htmlToText(episode.showNotesHtml)}
-        </ThemedText>
+          <ThemedText type="small" themeColor="textSecondary" numberOfLines={2}>
+            {htmlToText(episode.showNotesHtml)}
+          </ThemedText>
+        </Pressable>
         <View style={styles.footer}>
           <View style={styles.meta}>
             {saved?.played && <Icon name="check" size={14} color={theme.textSecondary} />}
@@ -92,6 +108,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   text: { flex: 1, gap: Spacing.half },
+  details: { gap: Spacing.half },
+  pressed: { opacity: 0.6 },
   footer: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' },
   meta: { flexDirection: 'row', flexShrink: 1, alignItems: 'center', gap: Spacing.one },
   // Right-aligned even when they wrap below a long meta line.

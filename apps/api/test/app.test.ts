@@ -86,6 +86,25 @@ describe('GET /v1/podcasts/:id/episodes', () => {
   });
 });
 
+describe('GET /v1/episodes/:id', () => {
+  it('returns the episode with its show', async () => {
+    const { app } = setup();
+    const { podcast } = (
+      await app.inject({ method: 'POST', url: '/v1/podcasts/resolve', payload: { feedUrl: 'https://example.com/feed.xml' } })
+    ).json();
+    const [episode] = (await app.inject({ url: `/v1/podcasts/${podcast.id}/episodes?limit=1` })).json().episodes;
+
+    const res = await app.inject({ url: `/v1/episodes/${episode.id}` });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ episode, podcast });
+  });
+
+  it('returns 404 for an unknown episode', async () => {
+    const { app } = setup();
+    expect((await app.inject({ url: '/v1/episodes/ep_missing' })).statusCode).toBe(404);
+  });
+});
+
 describe('background feed refresh', () => {
   const HOUR = 60 * 60_000;
   const newEpisode = `<item>

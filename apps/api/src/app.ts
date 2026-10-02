@@ -113,6 +113,15 @@ export function buildApp(deps: AppDeps = {}) {
     };
   });
 
+  // F-05: one episode with its show, for the episode page.
+  app.get<{ Params: { id: string } }>('/v1/episodes/:id', async (req, reply) => {
+    const episode = await store.findEpisodeById(req.params.id);
+    const podcast = episode && (await store.findPodcastById(episode.podcastId));
+    if (!episode || !podcast) return reply.status(404).send({ error: 'not_found' });
+    void catalog.refreshIfStale(podcast);
+    return { episode, podcast };
+  });
+
   const directory = (): PodcastDirectory => {
     if (!deps.directory) throw new DirectoryUnavailableError('No podcast directory is configured');
     return deps.directory;
