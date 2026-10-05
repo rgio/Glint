@@ -216,7 +216,7 @@ export function registerAccountRoutes(app: FastifyInstance, deps: AccountDeps) {
     const podcastIds = new Set<string>();
     for (const c of page) {
       if (c.kind === 'subscription') podcastIds.add(c.value.podcastId);
-      if (c.kind === 'episodeState' || c.kind === 'queueItem') episodeIds.add(c.value.episodeId);
+      if (c.kind === 'episodeState' || c.kind === 'queueItem' || c.kind === 'highlight') episodeIds.add(c.value.episodeId);
     }
     const episodes = (await Promise.all([...episodeIds].map((id) => deps.catalog.findEpisodeById(id)))).filter(
       (e): e is Episode => e !== null,

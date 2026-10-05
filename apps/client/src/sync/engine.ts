@@ -3,6 +3,7 @@ import {
   clampRate,
   DEFAULT_SETTINGS,
   mergeEpisodeState,
+  mergeHighlight,
   mergeOnSignIn,
   SYNC_BATCH_LIMIT,
   type Episode,
@@ -17,6 +18,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
 import { authedRequest, useAuth } from '@/auth/session';
+import { useHighlights } from '@/highlights/store';
 import { useLibrary } from '@/library/store';
 import { audioPlayer } from '@/player/audio-player';
 import { toPlayable } from '@/player/playable';
@@ -118,6 +120,15 @@ function recordLocalChanges() {
     enqueue(changes);
   });
 
+  useHighlights.subscribe((next, prev) => {
+    if (applyingRemote || !useAuth.getState().user || next.items === prev.items) return;
+    enqueue(
+      Object.values(next.items)
+        .filter((h) => prev.items[h.id] !== h)
+        .map((h): SyncChange => ({ kind: 'highlight', value: h })),
+    );
+  });
+
   usePlayer.subscribe((next, prev) => {
     if (applyingRemote || !useAuth.getState().user) return;
     const now = Date.now();
@@ -159,6 +170,8 @@ function applyRemote(changes: SyncChange[], catalog: Catalog, mergeState = merge
     const player = usePlayer.getState();
     const saved = { ...player.saved };
     const queue = new Map(player.queue.map((q) => [q.id, q]));
+    const highlights = { ...useHighlights.getState().items };
+    const highlightEpisodes = { ...useHighlights.getState().episodes };
     let settings: Settings | null = null;
 
     for (const change of changes) {
@@ -191,8 +204,17 @@ function applyRemote(changes: SyncChange[], catalog: Catalog, mergeState = merge
         case 'settings':
           settings = change.value;
           break;
+        case 'highlight': {
+          const local = highlights[change.value.id];
+          highlights[change.value.id] = local ? mergeHighlight(local, change.value) : change.value;
+          const episode = catalog.episodes.get(change.value.episodeId);
+          const podcast = episode && catalog.podcasts.get(episode.podcastId);
+          if (episode && podcast && !highlightEpisodes[episode.id]) highlightEpisodes[episode.id] = toPlayable(episode, podcast);
+          break;
+        }
       }
     }
+    useHighlights.setState({ items: highlights, episodes: highlightEpisodes });
 
     useLibrary.setState({ subscriptions });
     const sortedQueue = [...queue.values()].sort((a, b) => (a.sortKey < b.sortKey ? -1 : a.sortKey > b.sortKey ? 1 : 0));
@@ -265,6 +287,11 @@ async function mergeOnFirstSignIn(userId: string) {
     if (!remote.has(`queueItem:${q.id}`)) toPush.push(queueChange(q, false, now));
   }
   if (!remote.has('settings')) toPush.push(settingsChange(now));
+  for (const h of Object.values(useHighlights.getState().items)) {
+    const theirs = remote.get(`highlight:${h.id}`);
+    const merged = theirs?.kind === 'highlight' ? mergeHighlight(h, theirs.value) : h;
+    if (!theirs || JSON.stringify(merged) !== JSON.stringify(theirs.value)) toPush.push({ kind: 'highlight', value: merged });
+  }
 
   // Subscriptions the server has deleted but this device still has stay (combined), so skip
   // applying those deletions; everything else from the server applies, positions by the
@@ -325,7 +352,7 @@ let started = false;
 export async function startSync() {
   if (started) return;
   started = true;
-  await Promise.all([hydrated(useLibrary), hydrated(usePlayer), hydrated(useAuth), hydrated(useSync)]);
+  await Promise.all([hydrated(useLibrary), hydrated(usePlayer), hydrated(useAuth), hydrated(useSync), hydrated(useHighlights)]);
   // Start recording only after loading, so restoring saved state isn't mistaken for changes.
   recordLocalChanges();
 

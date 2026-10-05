@@ -7,6 +7,7 @@ import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
 
 import { deleteAccount, signOut, startEmailSignIn, useAuth, verifySignIn } from '@/auth/session';
+import { useHighlights } from '@/highlights/store';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { syncNow, useSync } from '@/sync/engine';
@@ -39,6 +40,27 @@ export function AccountRow() {
         <ThemedText type="small" themeColor="textSecondary">
           Settings
         </ThemedText>
+      </ThemedView>
+    </Pressable>
+  );
+}
+
+/** A row on Library leading to every highlight. */
+export function HighlightsRow() {
+  const count = useHighlights((s) => Object.values(s.items).filter((h) => !h.deleted).length);
+  return (
+    <Pressable
+      accessibilityRole="link"
+      accessibilityLabel={`Highlights, ${count}`}
+      onPress={() => router.push('/highlights')}
+      style={({ pressed }) => [pressed && styles.pressed]}>
+      <ThemedView type="backgroundElement" style={styles.row}>
+        <View style={styles.rowText}>
+          <ThemedText type="smallBold">Highlights</ThemedText>
+          <ThemedText type="small" themeColor="textSecondary">
+            {count === 0 ? 'Moments you save while listening' : `${count} saved`}
+          </ThemedText>
+        </View>
       </ThemedView>
     </Pressable>
   );

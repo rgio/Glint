@@ -97,6 +97,41 @@ export const DEFAULT_SETTINGS: Settings = {
   updatedAt: 0,
 };
 
+// Highlights: a listener-chosen range of an episode, with an optional note.
+
+/** Where a highlight was captured, for metrics. */
+export const HighlightSource = z.enum(['player', 'miniPlayer', 'keyboard', 'headphones', 'lockScreen']);
+export type HighlightSource = z.infer<typeof HighlightSource>;
+
+/** Longest highlight, in seconds of audio. */
+export const HIGHLIGHT_MAX_SEC = 300;
+/** Shortest highlight, in seconds of audio. */
+export const HIGHLIGHT_MIN_SEC = 3;
+export const HIGHLIGHT_NOTE_MAX = 5000;
+
+export const Highlight = z.object({
+  /** Made on the device, so offline captures never collide. */
+  id: z.uuid(),
+  episodeId: z.string(),
+  podcastId: z.string(),
+  startSec: z.number().nonnegative(),
+  endSec: z.number().nonnegative(),
+  note: z.string().max(HIGHLIGHT_NOTE_MAX).nullable(),
+  /** The transcript words in the range, once a transcript is available (later phase). */
+  transcriptExcerpt: z.string().nullable(),
+  chapterTitle: z.string().nullable(),
+  /** The episode as it was when captured, for relocating the range if the audio changes. */
+  anchorDurationSec: z.number().nonnegative().nullable(),
+  anchorEnclosureUrl: z.string().nullable(),
+  source: HighlightSource,
+  createdAt: z.number().int(),
+  /** The range and the note are edited separately, so each keeps its own edit time for merging. */
+  rangeUpdatedAt: z.number().int(),
+  noteUpdatedAt: z.number().int(),
+  deleted: z.boolean().default(false),
+});
+export type Highlight = z.infer<typeof Highlight>;
+
 // API request bodies.
 
 export const ResolveFeedRequest = z.object({ feedUrl: z.url() });

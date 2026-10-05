@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import { Platform, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import { Artwork } from './artwork';
+import { HighlightButton } from './highlights';
 import { IconButton } from './icon';
 import { SeekBar } from './scrubber';
 import { ThemedText } from './themed-text';
@@ -47,6 +48,7 @@ export function MiniPlayer({ compact = false }: { compact?: boolean }) {
       </Pressable>
       {inlineSeek && <InlineSeek />}
       <IconButton name={playing ? 'pause' : 'play'} label={playing ? 'Pause' : 'Play'} onPress={togglePlay} />
+      {!compact && <HighlightButton source="miniPlayer" variant="icon" />}
       {!compact && <IconButton name="skipForward" label="Skip forward" onPress={skipForward} />}
       {compact ? (
         <View style={[styles.progress, { width: `${fraction * 100}%`, backgroundColor: theme.tint }]} />

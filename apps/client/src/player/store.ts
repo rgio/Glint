@@ -47,6 +47,10 @@ type PlayerState = {
   playEpisode(episode: PlayableEpisode): Promise<void>;
   /** F-05 timestamps: plays `episode` from `seconds`, seeking if it's already loaded. */
   playFrom(episode: PlayableEpisode, seconds: number): void;
+  /** Plays `episode` from `startSec` and pauses at `endSec` (a highlight). */
+  playRange(episode: PlayableEpisode, startSec: number, endSec: number): void;
+  /** Where `playRange` will pause; cleared by any seek or new episode. */
+  stopAtSec: number | null;
   togglePlay(): void;
   seekTo(seconds: number): void;
   skipBack(): void;
@@ -84,6 +88,10 @@ export const usePlayer = create<PlayerState>()(
           ...(shouldMarkPlayed(positionSec, durationSec ?? current.durationSec) && { played: true }),
         });
       };
+
+      // playRange's stop only arms once playback is seen before the stop point, so a progress
+      // event from before the seek landed can't pause it straight away.
+      let stopArmed = false;
 
       let sleepTick: ReturnType<typeof setInterval> | null = null;
 
@@ -136,6 +144,15 @@ export const usePlayer = create<PlayerState>()(
               error: null,
             });
             if (Date.now() - lastSavedAt >= POSITION_SAVE_INTERVAL_MS) saveCurrentPosition();
+            const stopAt = get().stopAtSec;
+            if (stopAt !== null && event.playing) {
+              if (event.positionSec < stopAt - 0.5) stopArmed = true;
+              else if (stopArmed) {
+                audioPlayer.pause();
+                set({ playing: false, stopAtSec: null });
+                saveCurrentPosition();
+              }
+            }
             break;
           case 'ended': {
             const { current, sleepTimer } = get();
@@ -178,8 +195,17 @@ export const usePlayer = create<PlayerState>()(
         saved: {},
         sleepTimer: null,
         sleepRemainingSec: null,
+        stopAtSec: null,
+
+        playRange(episode, startSec, endSec) {
+          get().playFrom(episode, startSec);
+          // After playFrom, which clears it when it starts a new episode or seeks.
+          stopArmed = false;
+          set({ stopAtSec: endSec });
+        },
 
         async playEpisode(episode) {
+          set({ stopAtSec: null });
           if (get().current) saveCurrentPosition();
           const saved = get().saved[episode.id];
           // A finished episode starts over; otherwise resume where the listener left off.
@@ -230,6 +256,7 @@ export const usePlayer = create<PlayerState>()(
         },
 
         seekTo(seconds) {
+          set({ stopAtSec: null });
           const duration = get().durationSec;
           const target = Math.max(0, duration ? Math.min(seconds, duration) : seconds);
           if (get().loaded) audioPlayer.seekTo(target);

@@ -5,6 +5,7 @@ import { ThemedText } from './themed-text';
 
 import { useTheme } from '@/hooks/use-theme';
 import { formatClock } from '@/lib/format';
+import { useEpisodeHighlights } from '@/highlights/store';
 import { usePlayer } from '@/player/store';
 
 const THUMB_SIZE = 12;
@@ -31,6 +32,8 @@ export function SeekBar({ trackHeight = 4, hitHeight = 32, style }: SeekBarProps
   const originX = useRef(0);
   const positionSec = usePlayer((s) => s.positionSec);
   const durationSec = usePlayer((s) => s.durationSec);
+  const currentId = usePlayer((s) => s.current?.id);
+  const highlights = useEpisodeHighlights(currentId);
   const { seekTo, skipBack, skipForward } = usePlayer.getState();
 
   const clamp = (x: number) => Math.max(0, Math.min(width, x));
@@ -78,6 +81,22 @@ export function SeekBar({ trackHeight = 4, hitHeight = 32, style }: SeekBarProps
           { height: barHeight, borderRadius: barHeight / 2, backgroundColor: theme.backgroundSelected },
         ]}>
         <View style={[styles.fill, { width: `${fraction * 100}%`, backgroundColor: theme.tint }]} />
+        {/* Highlighted ranges, shaded over the bar. */}
+        {durationSec
+          ? highlights.map((h) => (
+              <View
+                key={h.id}
+                style={[
+                  styles.highlight,
+                  {
+                    left: `${(h.startSec / durationSec) * 100}%`,
+                    width: `${((h.endSec - h.startSec) / durationSec) * 100}%`,
+                    backgroundColor: theme.text,
+                  },
+                ]}
+              />
+            ))
+          : null}
       </View>
       {active && (
         <>
@@ -122,6 +141,7 @@ const styles = StyleSheet.create({
   // The bar's children ignore the pointer so every event targets the bar itself.
   track: { overflow: 'hidden', pointerEvents: 'none' },
   fill: { height: '100%' },
+  highlight: { position: 'absolute', top: 0, bottom: 0, minWidth: 2, opacity: 0.4 },
   thumb: {
     position: 'absolute',
     width: THUMB_SIZE,

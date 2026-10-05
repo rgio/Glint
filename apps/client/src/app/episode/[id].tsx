@@ -6,6 +6,7 @@ import { api, ApiError } from '@/api/client';
 import { Artwork } from '@/components/artwork';
 import { Button } from '@/components/button';
 import { toPlayable } from '@/components/episode-row';
+import { HighlightCard } from '@/components/highlights';
 import { IconButton } from '@/components/icon';
 import { SectionTitle, useContentInsets } from '@/components/screen';
 import { ShareButton } from '@/components/share-button';
@@ -14,6 +15,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { useEpisodeHighlights } from '@/highlights/store';
 import { formatDate, formatDuration } from '@/lib/format';
 import { usePlayer } from '@/player/store';
 
@@ -33,6 +35,7 @@ export default function EpisodeScreen() {
   const isCurrent = usePlayer((s) => s.current?.id === id);
   const playing = usePlayer((s) => s.playing && s.current?.id === id);
   const { playEpisode, togglePlay, playNext, playLast, setPlayed, playFrom } = usePlayer.getState();
+  const highlights = useEpisodeHighlights(id);
 
   if (!query.data) {
     return (
@@ -100,6 +103,15 @@ export default function EpisodeScreen() {
             />
             <ShareButton episode={playable} />
           </View>
+
+          {highlights.length > 0 && (
+            <>
+              <SectionTitle>Highlights</SectionTitle>
+              {highlights.map((h) => (
+                <HighlightCard key={h.id} highlight={h} />
+              ))}
+            </>
+          )}
 
           <SectionTitle>Show notes</SectionTitle>
           <ShowNotes

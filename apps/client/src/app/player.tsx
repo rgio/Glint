@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Artwork } from '@/components/artwork';
 import { IconButton } from '@/components/icon';
+import { HighlightButton } from '@/components/highlights';
 import { Scrubber } from '@/components/scrubber';
 import { ShareButton } from '@/components/share-button';
 import { SleepTimerButton, SleepTimerOptions } from '@/components/sleep-timer';
@@ -78,6 +79,7 @@ export default function PlayerScreen() {
             <ThemedText type="smallBold">{`${rate}x`}</ThemedText>
           </Pressable>
           <SleepTimerButton open={sleepOptionsOpen} onPress={() => setSleepOptionsOpen((open) => !open)} />
+          <HighlightButton source="player" variant="pill" />
           <ShareButton episode={current} />
         </View>
         {sleepOptionsOpen && <SleepTimerOptions onChoose={() => setSleepOptionsOpen(false)} />}

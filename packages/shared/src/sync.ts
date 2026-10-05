@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { Episode, EpisodeState, Podcast, QueueItem, Settings, Subscription } from './models';
+import { Episode, EpisodeState, Highlight, Podcast, QueueItem, Settings, Subscription } from './models';
 
 /**
  * Two writes this close together (ms) are treated as concurrent, so the
@@ -42,12 +42,36 @@ export function lastWriteWins<T extends Subscription | QueueItem | Settings>(a: 
   return a.updatedAt >= b.updatedAt ? a : b;
 }
 
+/**
+ * Highlights merge field by field: the range and the note each keep the newer edit, so editing
+ * the note on one device while adjusting the range on another keeps both. A deletion wins.
+ * Ties go to the larger value, so the result doesn't depend on which side is `a`.
+ */
+export function mergeHighlight(a: Highlight, b: Highlight): Highlight {
+  const newer = <T>(at: number, bt: number, av: T, bv: T) =>
+    at !== bt ? (at > bt ? av : bv) : JSON.stringify(av) >= JSON.stringify(bv) ? av : bv;
+  const range = newer(a.rangeUpdatedAt, b.rangeUpdatedAt, a, b);
+  const note = newer(a.noteUpdatedAt, b.noteUpdatedAt, a, b);
+  return {
+    ...range,
+    startSec: range.startSec,
+    endSec: range.endSec,
+    transcriptExcerpt: range.transcriptExcerpt ?? note.transcriptExcerpt,
+    rangeUpdatedAt: range.rangeUpdatedAt,
+    note: note.note,
+    noteUpdatedAt: note.noteUpdatedAt,
+    createdAt: Math.min(a.createdAt, b.createdAt),
+    deleted: a.deleted || b.deleted,
+  };
+}
+
 /** A change recorded in the client outbox and sent to `POST /v1/sync`. */
 export const SyncChange = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('subscription'), value: Subscription }),
   z.object({ kind: z.literal('episodeState'), value: EpisodeState }),
   z.object({ kind: z.literal('queueItem'), value: QueueItem }),
   z.object({ kind: z.literal('settings'), value: Settings }),
+  z.object({ kind: z.literal('highlight'), value: Highlight }),
 ]);
 export type SyncChange = z.infer<typeof SyncChange>;
 
@@ -62,6 +86,8 @@ export function changeKey(change: SyncChange): string {
       return `queueItem:${change.value.episodeId}`;
     case 'settings':
       return 'settings';
+    case 'highlight':
+      return `highlight:${change.value.id}`;
   }
 }
 

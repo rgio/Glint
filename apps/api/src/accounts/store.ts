@@ -2,6 +2,8 @@ import {
   changeKey,
   lastWriteWins,
   mergeEpisodeState,
+  mergeHighlight,
+  type Highlight,
   type EpisodeState,
   type QueueItem,
   type Settings,
@@ -78,6 +80,9 @@ export function mergeChange(existing: SyncChange | undefined, incoming: SyncChan
       break;
     case 'settings':
       merged = lastWriteWins(existing.value as Settings, incoming.value);
+      break;
+    case 'highlight':
+      merged = mergeHighlight(existing.value as Highlight, incoming.value);
       break;
   }
   return JSON.stringify(merged) === JSON.stringify(existing.value) ? null : ({ kind: incoming.kind, value: merged } as SyncChange);

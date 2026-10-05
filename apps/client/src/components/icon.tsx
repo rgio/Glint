@@ -18,6 +18,8 @@ const ICONS = {
   checkOutline: { ios: 'checkmark.circle', android: 'radio_button_unchecked', web: 'radio_button_unchecked' },
   sleep: { ios: 'moon.zzz', android: 'bedtime', web: 'bedtime' },
   share: { ios: 'square.and.arrow.up', android: 'share', web: 'ios_share' },
+  highlight: { ios: 'highlighter', android: 'ink_highlighter', web: 'ink_highlighter' },
+  trash: { ios: 'trash', android: 'delete', web: 'delete' },
 } as const;
 
 export type IconName = keyof typeof ICONS;

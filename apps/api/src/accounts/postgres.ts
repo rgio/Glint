@@ -1,4 +1,4 @@
-import type { Settings, SyncChange, User } from '@podcast/shared';
+import type { Highlight, Settings, SyncChange, User } from '@podcast/shared';
 import type { Sql, TransactionSql } from 'postgres';
 
 import { mergeChange, type AccountStore, type Session, type SignInRequest, type VersionedChange } from './store';
@@ -185,6 +185,11 @@ export class PostgresAccountStore implements AccountStore {
           select settings from user_settings where user_id = ${userId} for update`;
         return r && { kind: 'settings', value: r.settings };
       }
+      case 'highlight': {
+        const [r] = await tx<{ highlight: Highlight }[]>`
+          select highlight from user_highlights where user_id = ${userId} and id = ${change.value.id} for update`;
+        return r && { kind: 'highlight', value: r.highlight };
+      }
     }
   }
 
@@ -226,12 +231,19 @@ export class PostgresAccountStore implements AccountStore {
             version = excluded.version`;
         return;
       }
+      case 'highlight': {
+        await tx`
+          insert into user_highlights (user_id, id, highlight, version)
+          values (${userId}, ${change.value.id}, ${tx.json(change.value)}, nextval('sync_version'))
+          on conflict (user_id, id) do update set highlight = excluded.highlight, version = excluded.version`;
+        return;
+      }
     }
   }
 
   async changesSince(userId: string, since: bigint, limit: number): Promise<VersionedChange[]> {
     const after = since.toString();
-    const [subs, states, queue, settings] = await Promise.all([
+    const [subs, states, queue, settings, highlights] = await Promise.all([
       this.sql<{ podcast_id: string; subscribed_at: string; auto_download: boolean; updated_at: string; deleted: boolean; version: string }[]>`
         select podcast_id, subscribed_at, auto_download, updated_at, deleted, version from user_subscriptions
         where user_id = ${userId} and version > ${after} order by version limit ${limit}`,
@@ -243,6 +255,9 @@ export class PostgresAccountStore implements AccountStore {
         where user_id = ${userId} and version > ${after} order by version limit ${limit}`,
       this.sql<{ settings: Settings; version: string }[]>`
         select settings, version from user_settings where user_id = ${userId} and version > ${after}`,
+      this.sql<{ highlight: Highlight; version: string }[]>`
+        select highlight, version from user_highlights
+        where user_id = ${userId} and version > ${after} order by version limit ${limit}`,
     ]);
     const all: VersionedChange[] = [
       ...subs.map((r): VersionedChange => ({
@@ -261,6 +276,7 @@ export class PostgresAccountStore implements AccountStore {
         version: BigInt(r.version),
       })),
       ...settings.map((r): VersionedChange => ({ kind: 'settings', value: r.settings, version: BigInt(r.version) })),
+      ...highlights.map((r): VersionedChange => ({ kind: 'highlight', value: r.highlight, version: BigInt(r.version) })),
     ];
     return all.sort((a, b) => (a.version < b.version ? -1 : a.version > b.version ? 1 : 0)).slice(0, limit);
   }

@@ -104,6 +104,37 @@ function accountStoreContract(makeStore: () => Promise<AccountStore>) {
     expect(await store.changesSince(U1, 0n, 2)).toHaveLength(2);
   });
 
+  it('merges highlights field by field and lets deletions win', async () => {
+    await store.findOrCreateUser('a@example.com', U1);
+    const h = {
+      id: '30000000-0000-4000-8000-000000000001',
+      episodeId: 'ep_1',
+      podcastId: 'pod_1',
+      startSec: 100,
+      endSec: 130,
+      note: null,
+      transcriptExcerpt: null,
+      chapterTitle: null,
+      anchorDurationSec: 1800,
+      anchorEnclosureUrl: null,
+      source: 'player' as const,
+      createdAt: 1000,
+      rangeUpdatedAt: 1000,
+      noteUpdatedAt: 1000,
+      deleted: false,
+    };
+    expect(await store.applyChanges(U1, [{ kind: 'highlight', value: h }])).toBe(1);
+    // Two devices: one adjusts the range, the other adds a note. Both survive.
+    await store.applyChanges(U1, [{ kind: 'highlight', value: { ...h, startSec: 90, rangeUpdatedAt: 2000 } }]);
+    await store.applyChanges(U1, [{ kind: 'highlight', value: { ...h, note: 'idea', noteUpdatedAt: 3000 } }]);
+    const [stored] = await store.changesSince(U1, 0n, 10);
+    expect(stored).toMatchObject({ kind: 'highlight', value: { startSec: 90, note: 'idea', deleted: false } });
+
+    await store.applyChanges(U1, [{ kind: 'highlight', value: { ...h, deleted: true } }]);
+    await store.applyChanges(U1, [{ kind: 'highlight', value: { ...h, note: 'late edit', noteUpdatedAt: 9000 } }]);
+    expect((await store.changesSince(U1, 0n, 10))[0]?.value).toMatchObject({ deleted: true });
+  });
+
   it('keeps users apart and deletes everything with the account', async () => {
     await store.findOrCreateUser('a@example.com', U1);
     await store.findOrCreateUser('b@example.com', U2);

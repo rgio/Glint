@@ -1,5 +1,7 @@
 import * as DocumentPicker from 'expo-document-picker';
 
+import { saveTextFile } from '@/lib/save-file';
+
 /** Lets the listener pick an OPML file; resolves to its text, or null if they cancel. */
 export async function pickOpmlText(): Promise<string | null> {
   const result = await DocumentPicker.getDocumentAsync({ type: ['.opml', '.xml', 'text/xml', 'text/x-opml'] });
@@ -7,13 +9,7 @@ export async function pickOpmlText(): Promise<string | null> {
   return file ? file.text() : null;
 }
 
-/** Downloads the OPML as a file. */
-export async function saveOpml(xml: string, filename: string): Promise<void> {
-  const url = URL.createObjectURL(new Blob([xml], { type: 'text/x-opml' }));
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = filename;
-  link.click();
-  // Give the browser a moment to start the download before releasing the URL.
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+/** Saves the OPML: the share sheet on phones, a download on the web. */
+export function saveOpml(xml: string, filename: string): Promise<void> {
+  return saveTextFile(xml, filename, { mimeType: 'text/x-opml', uti: 'public.xml', dialogTitle: 'Export subscriptions' });
 }
