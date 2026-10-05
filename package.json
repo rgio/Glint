@@ -7,6 +7,7 @@
     "dev:worker": "pnpm --filter @podcast/feed-worker dev",
     "dev:client": "pnpm --filter @podcast/client start",
     "test": "turbo run test",
+    "e2e": "pnpm --filter @podcast/e2e e2e",
     "typecheck": "turbo run typecheck",
     "lint": "turbo run lint"
   },

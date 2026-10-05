@@ -41,8 +41,8 @@ P1 and P2 items (F-16 to F-27) are not started, as planned. The feed parser alre
 | Settings screen, onboarding, `/episode/[id]` route | ⬜ | Spec routes not yet built |
 | Wide-screen layout (sidebar + right-hand player at >1024 px) | ⬜ | |
 | i18n (i18next, EN + ES), web keyboard shortcuts | ⬜ | |
-| Component tests, Maestro, Playwright E2E | 🟡 | The client now runs vitest for plain logic modules (`pnpm test`). Web flows were checked with throwaway headless-browser scripts, not a committed suite |
-| CI (lint, typecheck, tests, EAS preview builds) | ⬜ | |
+| Component tests, Maestro, Playwright E2E | 🟡 | Vitest for plain client logic (`pnpm test`). Playwright web suite in `apps/e2e` (`pnpm e2e`, 13 tests: discover, playback and seeking, resume, episode notes and timestamps, sharing, OPML, Home badge, seasons, sleep timer, two-device sync). It runs against a fixture server (feeds and audio served locally) and the real API with a fake Podcast Index, so it needs no network. Missing: component tests and Maestro for native. |
+| CI (lint, typecheck, tests, EAS preview builds) | 🟡 | `.github/workflows/ci.yml`: lint, typecheck and unit tests with a Postgres service, plus the Playwright suite (report uploaded on failure). Not yet run on GitHub: it starts with the next push. Missing: EAS preview builds. |
 | Sentry, analytics | ⬜ | |
 | Git repo at `podcast-app/` | ✅ | The nested `apps/client/.git` was removed and the client committed into the main repo (`17a1a8f`). |
 | Real bundle id / package name | ⬜ | `com.example.podcast` is a placeholder |

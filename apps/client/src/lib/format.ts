@@ -24,6 +24,8 @@ export function formatDate(iso: string | null): string | null {
 export function htmlToText(html: string | null): string {
   if (!html) return '';
   return html
+    // Script and style contents aren't text; drop them along with their tags.
+    .replace(/<(script|style)\b[\s\S]*?<\/\1\s*>/gi, '')
     .replace(/<(br|\/p|\/div|\/li)\s*\/?>/gi, '\n')
     .replace(/<[^>]+>/g, '')
     .replace(/&nbsp;/g, ' ')
