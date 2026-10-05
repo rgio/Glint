@@ -164,3 +164,5 @@ export function parseFeed(xml: string): ParsedFeed {
     episodes,
   };
 }
+
+export * from './opml';

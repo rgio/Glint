@@ -10,6 +10,8 @@ type LibraryState = {
   /** When the listener last opened Home; drives the "New" section (F-11). */
   lastHomeVisitAt: number;
   toggleSubscription(podcast: Podcast): void;
+  /** Subscribes if not already subscribed; never unsubscribes. */
+  subscribe(podcast: Podcast): void;
   markHomeVisited(): void;
 };
 
@@ -24,6 +26,11 @@ export const useLibrary = create<LibraryState>()(
         set({
           subscriptions: existing ? rest : { ...rest, [podcast.id]: { podcast, subscribedAt: Date.now() } },
         });
+      },
+
+      subscribe(podcast) {
+        if (podcast.id in get().subscriptions) return;
+        set({ subscriptions: { ...get().subscriptions, [podcast.id]: { podcast, subscribedAt: Date.now() } } });
       },
 
       markHomeVisited() {

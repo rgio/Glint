@@ -8,7 +8,7 @@ Checked against the code on 2026-10-01 (updated later that day after persistence
 | --- | --- | --- | --- |
 | F-01 | Discovery (Podcast Index trending + categories) | 🟡 | `GET /v1/discover?section=top\|category:<id>` and `/v1/discover/categories` (`apps/api/src/podcast-index.ts`), and a Trending list with category chips on Discover, filtered to the device language (`src/lib/locale.ts`). Verified against the live Podcast Index API. Missing: region filtering. Note that Podcast Index "trending" ranks recent activity, not popularity, so the Top list skews toward small, recently active shows. |
 | F-02 | Search | 🟡 | `GET /v1/search?q=` (Podcast Index `search/byterm`, cached 10 min) and a debounced search box on Discover. Shows only: Podcast Index has no full-text episode search, so `type=episode` from the spec isn't built. Search has no language filter upstream. Verified against the live API. |
-| F-03 | Subscribe (search, show page, RSS URL) + OPML | 🟡 | Add by RSS URL and from search or charts works (`POST /v1/podcasts/resolve`), and subscribe/unsubscribe works and persists (`library/store.ts`). Missing: OPML import/export. |
+| F-03 | Subscribe (search, show page, RSS URL) + OPML | ✅ | Add by RSS URL and from search or charts (`POST /v1/podcasts/resolve`); subscriptions persist. OPML import and export on Library: parsing and writing in `packages/feed-parser` (`parseOpml`, `buildOpml`), import adds feeds 4 at a time with progress and a failure list, skipping shows already subscribed. Export downloads a file on web and opens the share sheet on phones (not yet tried on a device). Done on the device; the spec's `/v1/me/opml` endpoints wait for accounts. |
 | F-04 | Show page | ✅ | Artwork, paged episodes, a Newest/Oldest sort, "Season N" headings for shows with two or more seasons, and "Play latest" (always the newest, whatever the sort). |
 | F-05 | Episode page / show notes | ✅ | `/episode/[id]` (via `GET /v1/episodes/:id`), opened from any episode row. Show notes are parsed with htmlparser2 into a safe subset (text, emphasis, http/https/mailto links, headings, quotes, lists) and rendered natively (`src/lib/show-notes.ts`, unit-tested); timestamps within the episode's length play from that point. Images aren't shown. |
 | F-06 | Playback | 🟡 | Play, pause, seek, skip 15/30 s and speed presets work. Missing: configurable skip intervals in settings and 0.1 speed steps in the UI. Native speed is capped at 2.0x by expo-audio. |
@@ -56,7 +56,7 @@ P1 and P2 items (F-16 to F-27) are not started, as planned. The feed parser alre
 4. ~~Add local persistence for the player and library stores.~~ Done (key-value; see above).
 5. ~~Postgres `CatalogStore` and a feed worker with adaptive polling.~~ Done; run it with `pnpm dev:worker`. WebSub is still to do.
 6. ~~Podcast Index integration for search (F-02) and trending (F-01).~~ Built; needs the key (step 2).
-7. ~~Sleep timer (F-14).~~ Done. Next: downloads (F-10) and OPML (F-03).
+7. ~~Sleep timer (F-14).~~ Done. ~~OPML (F-03).~~ Done. Next: downloads (F-10), after the phone test.
 8. Auth, then the sync outbox and `/v1/sync` (F-12, F-13).
 
 ## Open questions (from the spec)

@@ -28,7 +28,8 @@ function RowBody({ podcast }: { podcast: Pick<Podcast, 'title' | 'author' | 'art
 export function PodcastRow({ podcast }: { podcast: Podcast }) {
   return (
     <Link href={{ pathname: '/podcast/[id]', params: { id: podcast.id } }} asChild>
-      <Pressable style={({ pressed }) => [styles.row, pressed && styles.pressed]} accessibilityRole="link">
+      {/* A plain style: Link's web wrapper drops function styles, which lost the row layout. */}
+      <Pressable style={styles.row} accessibilityRole="link">
         <RowBody podcast={podcast} />
       </Pressable>
     </Link>
