@@ -8,6 +8,7 @@ import { Button } from '@/components/button';
 import { toPlayable } from '@/components/episode-row';
 import { IconButton } from '@/components/icon';
 import { SectionTitle, useContentInsets } from '@/components/screen';
+import { ShareButton } from '@/components/share-button';
 import { ShowNotes } from '@/components/show-notes';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -97,6 +98,7 @@ export default function EpisodeScreen() {
               color={saved?.played ? theme.tint : undefined}
               onPress={() => setPlayed(episode.id, !saved?.played)}
             />
+            <ShareButton episode={playable} />
           </View>
 
           <SectionTitle>Show notes</SectionTitle>

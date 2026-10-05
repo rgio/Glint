@@ -21,7 +21,7 @@ const directory =
 const sql = DATABASE_URL ? postgres(DATABASE_URL, { onnotice: () => {} }) : undefined;
 const store = sql ? new PostgresCatalogStore(sql) : undefined;
 
-const app = buildApp({ logger: true, corsOrigins, directory, store });
+const app = buildApp({ logger: true, corsOrigins, directory, store, webUrl: process.env.WEB_URL });
 if (!directory) app.log.warn('PODCAST_INDEX_KEY / PODCAST_INDEX_SECRET not set: search and charts are disabled');
 if (sql) {
   app.addHook('onClose', () => sql.end({ timeout: 5 }));

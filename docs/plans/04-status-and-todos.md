@@ -20,7 +20,7 @@ Checked against the code on 2026-10-01 (updated later that day after persistence
 | F-12 | Accounts (optional, signed-out works) | ⬜ | No auth. The sign-in merge rule exists in `packages/shared` (`mergeOnSignIn`). |
 | F-13 | Sync (pull-based) | ⬜ | Merge rules and the `SyncChange` type exist in shared. Missing: outbox, `/v1/sync` endpoints and the SyncEngine. |
 | F-14 | Sleep timer | ✅ | 5/15/30/60 min or end of episode from the full player, with a live countdown and a fade over the last 10 s (`src/components/sleep-timer.tsx`, rules in `packages/shared`). End of episode stops instead of starting the next queued episode. The timer isn't persisted. iOS Safari ignores scripted volume, so there the fade is silent but the stop still works. Native not yet tested on a device. |
-| F-15 | Share episode link | ⬜ | Not started. Needs public web episode pages. |
+| F-15 | Share episode link | ✅ | A Share button on the episode page and full player (native share sheet; on web the browser's share dialog, else copy with "Link copied"). Links point at `/s/e/:id` on the API, a small page with Open Graph tags for chat-app previews that redirects to the web app's episode page (`WEB_URL`). Expo's server rendering isn't stable until SDK 58, so previews don't come from the web app itself. Production needs a public domain for `/s/` (`EXPO_PUBLIC_SHARE_URL`) and `trustProxy` behind a proxy; universal/app links come later. Native share not yet tried on a device. |
 
 P1 and P2 items (F-16 to F-27) are not started, as planned. The feed parser already extracts `chaptersUrl` and `transcriptUrl` for F-16.
 

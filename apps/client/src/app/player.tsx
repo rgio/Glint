@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Artwork } from '@/components/artwork';
 import { IconButton } from '@/components/icon';
 import { Scrubber } from '@/components/scrubber';
+import { ShareButton } from '@/components/share-button';
 import { SleepTimerButton, SleepTimerOptions } from '@/components/sleep-timer';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -77,6 +78,7 @@ export default function PlayerScreen() {
             <ThemedText type="smallBold">{`${rate}x`}</ThemedText>
           </Pressable>
           <SleepTimerButton open={sleepOptionsOpen} onPress={() => setSleepOptionsOpen((open) => !open)} />
+          <ShareButton episode={current} />
         </View>
         {sleepOptionsOpen && <SleepTimerOptions onChoose={() => setSleepOptionsOpen(false)} />}
 

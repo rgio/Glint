@@ -13,10 +13,13 @@ import Fastify from 'fastify';
 import { z } from 'zod';
 
 import { DirectoryUnavailableError, type PodcastDirectory } from './podcast-index';
+import { renderShareNotFound, renderSharePage } from './share';
 
 export type AppDeps = {
   store?: CatalogStore;
   fetchFeed?: FetchFeed;
+  /** Where the web app is served; share links send people on to its episode pages. */
+  webUrl?: string;
   /** Clock for feed freshness checks; tests move it forward. */
   now?: () => number;
   /** Search and charts. Without one, those endpoints answer 503. */
@@ -120,6 +123,19 @@ export function buildApp(deps: AppDeps = {}) {
     if (!episode || !podcast) return reply.status(404).send({ error: 'not_found' });
     void catalog.refreshIfStale(podcast);
     return { episode, podcast };
+  });
+
+  // F-15: shared episode links. Link previews come from this page's Open Graph tags; people
+  // are sent on to the episode page in the web app.
+  const webUrl = (deps.webUrl ?? 'http://localhost:8081').replace(/\/$/, '');
+  app.get<{ Params: { id: string } }>('/s/e/:id', async (req, reply) => {
+    const episode = await store.findEpisodeById(req.params.id);
+    const podcast = episode && (await store.findPodcastById(episode.podcastId));
+    reply.type('text/html; charset=utf-8').header('cache-control', 'public, max-age=300');
+    if (!episode || !podcast) return reply.status(404).send(renderShareNotFound(webUrl));
+    const shareUrl = `${req.protocol}://${req.host}${req.url.split('?')[0]}`;
+    const episodeUrl = `${webUrl}/episode/${encodeURIComponent(episode.id)}`;
+    return renderSharePage({ episode, podcast, shareUrl, episodeUrl });
   });
 
   const directory = (): PodcastDirectory => {
