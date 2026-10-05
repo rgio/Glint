@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
+import { AccountRow } from '@/components/account';
 import { Button } from '@/components/button';
 import { PodcastRow } from '@/components/podcast-row';
 import { EmptyState, SectionTitle, TabScreen } from '@/components/screen';
@@ -48,6 +49,7 @@ export default function LibraryScreen() {
 
   return (
     <TabScreen title="Library">
+      <AccountRow />
       <SectionTitle>Subscriptions</SectionTitle>
       <View style={styles.actions}>
         <Button title="Import OPML" variant="secondary" loading={importing} onPress={startImport} style={styles.grow} />

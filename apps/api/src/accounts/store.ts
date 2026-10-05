@@ -1,4 +1,5 @@
 import {
+  changeKey,
   lastWriteWins,
   mergeEpisodeState,
   type EpisodeState,
@@ -80,20 +81,6 @@ export function mergeChange(existing: SyncChange | undefined, incoming: SyncChan
       break;
   }
   return JSON.stringify(merged) === JSON.stringify(existing.value) ? null : ({ kind: incoming.kind, value: merged } as SyncChange);
-}
-
-/** The key a change is stored under, within one user's data. */
-export function changeKey(change: SyncChange): string {
-  switch (change.kind) {
-    case 'subscription':
-      return `subscription:${change.value.podcastId}`;
-    case 'episodeState':
-      return `episodeState:${change.value.episodeId}`;
-    case 'queueItem':
-      return `queueItem:${change.value.episodeId}`;
-    case 'settings':
-      return 'settings';
-  }
 }
 
 export class InMemoryAccountStore implements AccountStore {

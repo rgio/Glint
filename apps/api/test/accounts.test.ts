@@ -144,6 +144,32 @@ describe('email sign-in', () => {
   });
 });
 
+describe('request errors', () => {
+  it('reports an empty JSON body as a bad request, not a server error', async () => {
+    const { app } = await setup();
+    const res = await app.inject({ method: 'DELETE', url: '/v1/me', headers: { 'content-type': 'application/json' } });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().error).toBe('invalid_request');
+  });
+});
+
+describe('CORS', () => {
+  it("lets the web app call every account endpoint with credentials, and nobody else", async () => {
+    const { app } = await setup();
+    const preflight = (origin: string, method: string) =>
+      app.inject({
+        method: 'OPTIONS',
+        url: '/v1/me',
+        headers: { origin, 'access-control-request-method': method, 'access-control-request-headers': 'authorization' },
+      });
+    const ok = await preflight('https://listen.example.com', 'DELETE');
+    expect(ok.headers['access-control-allow-origin']).toBe('https://listen.example.com');
+    expect(ok.headers['access-control-allow-credentials']).toBe('true');
+    expect(String(ok.headers['access-control-allow-methods'])).toContain('DELETE');
+    expect((await preflight('https://evil.example.com', 'DELETE')).headers['access-control-allow-origin']).toBeUndefined();
+  });
+});
+
 describe('sessions', () => {
   it('rotates the refresh token on every use; an old one stops working', async () => {
     const { app, signIn, auth } = await setup();
@@ -189,6 +215,7 @@ describe('sessions', () => {
   it('signs out by revoking the session', async () => {
     const { app, signIn, auth } = await setup();
     const s = await signIn('ann@example.com');
+    // As the app sends it: no body, no content type.
     expect((await app.inject({ method: 'POST', url: '/v1/auth/sign-out', headers: auth(s.accessToken) })).statusCode).toBe(204);
     const refresh = await app.inject({ method: 'POST', url: '/v1/auth/refresh', payload: { client: 'native', refreshToken: s.refreshToken } });
     expect(refresh.statusCode).toBe(401);

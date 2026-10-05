@@ -10,19 +10,9 @@ import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { formatDate, formatDuration, htmlToText } from '@/lib/format';
 import { usePlayer } from '@/player/store';
-import type { PlayableEpisode } from '@/player/types';
+import { toPlayable } from '@/player/playable';
 
-export function toPlayable(episode: Episode, podcast: Podcast): PlayableEpisode {
-  return {
-    id: episode.id,
-    podcastId: podcast.id,
-    title: episode.title,
-    podcastTitle: podcast.title,
-    url: episode.enclosureUrl,
-    artworkUrl: episode.artworkUrl ?? podcast.artworkUrl,
-    durationSec: episode.durationSec,
-  };
-}
+export { toPlayable };
 
 export function EpisodeRow({ episode, podcast, showPodcast = false }: { episode: Episode; podcast: Podcast; showPodcast?: boolean }) {
   const theme = useTheme();

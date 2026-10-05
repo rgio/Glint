@@ -13,12 +13,12 @@ Checked against the code on 2026-10-01 (updated later that day after persistence
 | F-05 | Episode page / show notes | ✅ | `/episode/[id]` (via `GET /v1/episodes/:id`), opened from any episode row. Show notes are parsed with htmlparser2 into a safe subset (text, emphasis, http/https/mailto links, headings, quotes, lists) and rendered natively (`src/lib/show-notes.ts`, unit-tested); timestamps within the episode's length play from that point. Images aren't shown. |
 | F-06 | Playback | 🟡 | Play, pause, seek, skip 15/30 s and speed presets work. Missing: configurable skip intervals in settings and 0.1 speed steps in the UI. Native speed is capped at 2.0x by expo-audio. |
 | F-07 | Queue | 🟡 | Play next, play last, auto-advance, remove, and move up/down buttons work. Missing: drag to reorder and swipe to remove. |
-| F-08 | Resume | 🟡 | Position is saved every 10 s, on pause, on seek and when the app is backgrounded, and persists across restarts. Missing: cross-device resume (needs sync). |
+| F-08 | Resume | ✅ | Position is saved every 10 s, on pause, on seek and when the app is backgrounded, persists across restarts, and syncs to other devices signed into the same account. |
 | F-09 | Played state | ✅ | Auto-mark at 95% or fewer than 30 s left, plus a mark played/unplayed button on every episode row; both persist. |
 | F-10 | Downloads (mobile) | ⬜ | Not started. Needs a `DownloadManager` interface and expo-file-system. |
 | F-11 | Home "New" section | ✅ | New episodes since the last visit, and a badge on the Home tab (web and native) counting the unplayed ones, hidden while Home is open. Subscriptions are re-checked every 15 min while the app is open. |
-| F-12 | Accounts (optional, signed-out works) | ⬜ | No auth. The sign-in merge rule exists in `packages/shared` (`mergeOnSignIn`). |
-| F-13 | Sync (pull-based) | ⬜ | Merge rules and the `SyncChange` type exist in shared. Missing: outbox, `/v1/sync` endpoints and the SyncEngine. |
+| F-12 | Accounts (optional, signed-out works) | 🟡 | Email sign-in: the email has a link (web, `/sign-in?token=`) and a 6-digit code (any device). 15-minute access tokens, 90-day refresh tokens rotated on use (Keychain/Keystore via expo-secure-store on phones, an HttpOnly cookie on web). Sign-out, and account deletion (`DELETE /v1/me`). First sign-in on a device combines subscriptions and keeps the furthest position. Settings screen (`/settings`), linked from Library. **Missing:** Sign in with Apple and Google (need an Apple developer team and a Google OAuth client), and a real email provider: development writes sign-in emails to the API log. |
+| F-13 | Sync (pull-based) | ✅ | `POST /v1/sync` / `GET /v1/sync?since=` with a server-wide version sequence as the cursor. The client (`src/sync/engine.ts`) records changes by diffing the library and player stores into an outbox (newest per record), and syncs on launch, return to foreground, pause, every 60 s while playing, and 3 s after other changes. Subscriptions, queue, positions, played state and speed/skip settings. Verified with two browsers on one account. Known gap: two web tabs refreshing at the same moment can sign one out (refresh tokens are single-use). Highlights will join as a change type. |
 | F-14 | Sleep timer | ✅ | 5/15/30/60 min or end of episode from the full player, with a live countdown and a fade over the last 10 s (`src/components/sleep-timer.tsx`, rules in `packages/shared`). End of episode stops instead of starting the next queued episode. The timer isn't persisted. iOS Safari ignores scripted volume, so there the fade is silent but the stop still works. Native not yet tested on a device. |
 | F-15 | Share episode link | ✅ | A Share button on the episode page and full player (native share sheet; on web the browser's share dialog, else copy with "Link copied"). Links point at `/s/e/:id` on the API, a small page with Open Graph tags for chat-app previews that redirects to the web app's episode page (`WEB_URL`). Expo's server rendering isn't stable until SDK 58, so previews don't come from the web app itself. Production needs a public domain for `/s/` (`EXPO_PUBLIC_SHARE_URL`) and `trustProxy` behind a proxy; universal/app links come later. Native share not yet tried on a device. |
 
@@ -57,7 +57,7 @@ P1 and P2 items (F-16 to F-27) are not started, as planned. The feed parser alre
 5. ~~Postgres `CatalogStore` and a feed worker with adaptive polling.~~ Done; run it with `pnpm dev:worker`. WebSub is still to do.
 6. ~~Podcast Index integration for search (F-02) and trending (F-01).~~ Built; needs the key (step 2).
 7. ~~Sleep timer (F-14).~~ Done. ~~OPML (F-03).~~ Done. Next: downloads (F-10), after the phone test.
-8. Auth, then the sync outbox and `/v1/sync` (F-12, F-13).
+8. ~~Accounts and sync (F-12, F-13).~~ Done for email sign-in. Next: an email provider for production, then Sign in with Apple and Google once credentials exist.
 
 ## Open questions (from the spec)
 

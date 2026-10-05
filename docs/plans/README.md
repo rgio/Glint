@@ -11,7 +11,7 @@ Everything planned and decided in the 2026-10-01 Claude Code session that specce
 
 ## Where things stand
 
-A local vertical slice works: search or browse charts (with a Podcast Index key) or paste an RSS URL, open the show, play, queue and resume, on iOS, Android and web from one codebase, against a Fastify API backed by PostgreSQL. Subscriptions, queue and positions persist on the device. Accounts, sync, downloads and the sleep timer are not started. See [04-status-and-todos.md](04-status-and-todos.md).
+A local vertical slice works: search or browse charts (with a Podcast Index key) or paste an RSS URL, open the show, play, queue and resume, on iOS, Android and web from one codebase, against a Fastify API backed by PostgreSQL. Subscriptions, queue and positions persist on the device, and sync across devices with an optional account (email sign-in). Downloads are not started. See [04-status-and-todos.md](04-status-and-todos.md).
 
 ## Run it
 

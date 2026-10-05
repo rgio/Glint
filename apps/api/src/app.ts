@@ -73,7 +73,8 @@ export function buildApp(deps: AppDeps = {}) {
   );
 
   // Credentials (the web app's refresh cookie) are allowed, so only the web app's origin may call.
-  app.register(cors, { origin: deps.corsOrigins ?? [webUrl], credentials: true });
+  // The plugin allows only GET, HEAD and POST unless told otherwise; DELETE /v1/me needs DELETE.
+  app.register(cors, { origin: deps.corsOrigins ?? [webUrl], credentials: true, methods: ['GET', 'HEAD', 'POST', 'DELETE'] });
   app.register(cookie);
 
   app.setErrorHandler((err, req, reply) => {
@@ -103,6 +104,11 @@ export function buildApp(deps: AppDeps = {}) {
     }
     if (err instanceof TypeError && /Invalid URL/i.test(err.message)) {
       return reply.status(400).send({ error: 'invalid_url' });
+    }
+    // Fastify's own request errors (bad content type, empty JSON body, too large) carry a 4xx.
+    const status = (err as { statusCode?: number }).statusCode;
+    if (status && status >= 400 && status < 500) {
+      return reply.status(status).send({ error: 'invalid_request', message: (err as Error).message });
     }
     req.log.error(err);
     return reply.status(500).send({ error: 'internal' });

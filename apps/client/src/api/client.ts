@@ -19,16 +19,18 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+export async function request<T>(path: string, init?: RequestInit): Promise<T> {
   let res: Response;
   try {
     res = await fetch(`${API_URL}${path}`, {
       ...init,
-      headers: { 'Content-Type': 'application/json', ...init?.headers },
+      // Only with a body: the server rejects an empty body that claims to be JSON.
+      headers: { ...(init?.body !== undefined && { 'Content-Type': 'application/json' }), ...init?.headers },
     });
   } catch {
     throw new ApiError('Could not reach the server. Check your connection.', 0, 'network');
   }
+  if (res.status === 204) return undefined as T;
   const body = await res.json().catch(() => ({}));
   if (!res.ok) {
     throw new ApiError(body.message ?? `Request failed (${res.status})`, res.status, body.error ?? 'unknown');

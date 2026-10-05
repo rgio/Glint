@@ -51,6 +51,20 @@ export const SyncChange = z.discriminatedUnion('kind', [
 ]);
 export type SyncChange = z.infer<typeof SyncChange>;
 
+/** What a change is about, e.g. `subscription:pod_1`. Two changes with the same key update the same record. */
+export function changeKey(change: SyncChange): string {
+  switch (change.kind) {
+    case 'subscription':
+      return `subscription:${change.value.podcastId}`;
+    case 'episodeState':
+      return `episodeState:${change.value.episodeId}`;
+    case 'queueItem':
+      return `queueItem:${change.value.episodeId}`;
+    case 'settings':
+      return 'settings';
+  }
+}
+
 /** F-13: the client sends its outbox in batches of at most this many changes. */
 export const SYNC_BATCH_LIMIT = 200;
 
