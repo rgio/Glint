@@ -1,3 +1,6 @@
+import { randomBytes } from 'node:crypto';
+
+import cookie from '@fastify/cookie';
 import cors from '@fastify/cors';
 import {
   Catalog,
@@ -12,12 +15,21 @@ import { ResolveFeedRequest } from '@podcast/shared';
 import Fastify from 'fastify';
 import { z } from 'zod';
 
+import { LogEmailSender, type EmailSender } from './accounts/email';
+import { AuthError, registerAccountRoutes } from './accounts/routes';
+import { InMemoryAccountStore, type AccountStore } from './accounts/store';
 import { DirectoryUnavailableError, type PodcastDirectory } from './podcast-index';
 import { renderShareNotFound, renderSharePage } from './share';
 
 export type AppDeps = {
   store?: CatalogStore;
   fetchFeed?: FetchFeed;
+  /** Accounts, sessions and synced state. Defaults to in memory. */
+  accounts?: AccountStore;
+  /** Sends sign-in emails. Defaults to writing them to the log. */
+  email?: EmailSender;
+  /** Signs access tokens. Defaults to a random secret, so tokens die with the process. */
+  authSecret?: string;
   /** Where the web app is served; share links send people on to its episode pages. */
   webUrl?: string;
   /** Clock for feed freshness checks; tests move it forward. */
@@ -55,13 +67,19 @@ const DiscoverQuery = z.object({
 export function buildApp(deps: AppDeps = {}) {
   const store = deps.store ?? new InMemoryCatalogStore();
   const app = Fastify({ logger: deps.logger ?? false });
+  const webUrl = (deps.webUrl ?? 'http://localhost:8081').replace(/\/$/, '');
   const catalog = new Catalog(store, deps.fetchFeed ?? defaultFetchFeed, deps.now, (err, podcast) =>
     app.log.warn({ err, podcastId: podcast.id }, 'background feed refresh failed'),
   );
 
-  app.register(cors, { origin: deps.corsOrigins ?? true });
+  // Credentials (the web app's refresh cookie) are allowed, so only the web app's origin may call.
+  app.register(cors, { origin: deps.corsOrigins ?? [webUrl], credentials: true });
+  app.register(cookie);
 
   app.setErrorHandler((err, req, reply) => {
+    if (err instanceof AuthError) {
+      return reply.status(err.status).send({ error: err.code, message: err.message });
+    }
     if (err instanceof z.ZodError) {
       return reply.status(400).send({ error: 'invalid_request', issues: err.issues });
     }
@@ -127,7 +145,6 @@ export function buildApp(deps: AppDeps = {}) {
 
   // F-15: shared episode links. Link previews come from this page's Open Graph tags; people
   // are sent on to the episode page in the web app.
-  const webUrl = (deps.webUrl ?? 'http://localhost:8081').replace(/\/$/, '');
   app.get<{ Params: { id: string } }>('/s/e/:id', async (req, reply) => {
     const episode = await store.findEpisodeById(req.params.id);
     const podcast = episode && (await store.findPodcastById(episode.podcastId));
@@ -136,6 +153,15 @@ export function buildApp(deps: AppDeps = {}) {
     const shareUrl = `${req.protocol}://${req.host}${req.url.split('?')[0]}`;
     const episodeUrl = `${webUrl}/episode/${encodeURIComponent(episode.id)}`;
     return renderSharePage({ episode, podcast, shareUrl, episodeUrl });
+  });
+
+  registerAccountRoutes(app, {
+    accounts: deps.accounts ?? new InMemoryAccountStore(),
+    catalog: store,
+    email: deps.email ?? new LogEmailSender((message) => app.log.info(message)),
+    authSecret: deps.authSecret ?? randomBytes(32).toString('base64url'),
+    webUrl,
+    now: deps.now,
   });
 
   const directory = (): PodcastDirectory => {

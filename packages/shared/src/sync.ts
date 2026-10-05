@@ -1,4 +1,6 @@
-import type { EpisodeState, QueueItem, Subscription } from './models';
+import { z } from 'zod';
+
+import { Episode, EpisodeState, Podcast, QueueItem, Settings, Subscription } from './models';
 
 /**
  * Two writes this close together (ms) are treated as concurrent, so the
@@ -35,13 +37,34 @@ export function mergeOnSignIn(local: EpisodeState, remote: EpisodeState): Episod
   };
 }
 
-/** Last write wins for whole records (subscriptions, queue items). */
-export function lastWriteWins<T extends Subscription | QueueItem>(a: T, b: T): T {
+/** Last write wins for whole records (subscriptions, queue items, settings). */
+export function lastWriteWins<T extends Subscription | QueueItem | Settings>(a: T, b: T): T {
   return a.updatedAt >= b.updatedAt ? a : b;
 }
 
 /** A change recorded in the client outbox and sent to `POST /v1/sync`. */
-export type SyncChange =
-  | { kind: 'episodeState'; value: EpisodeState }
-  | { kind: 'subscription'; value: Subscription }
-  | { kind: 'queueItem'; value: QueueItem };
+export const SyncChange = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('subscription'), value: Subscription }),
+  z.object({ kind: z.literal('episodeState'), value: EpisodeState }),
+  z.object({ kind: z.literal('queueItem'), value: QueueItem }),
+  z.object({ kind: z.literal('settings'), value: Settings }),
+]);
+export type SyncChange = z.infer<typeof SyncChange>;
+
+/** F-13: the client sends its outbox in batches of at most this many changes. */
+export const SYNC_BATCH_LIMIT = 200;
+
+export const SyncPushRequest = z.object({ changes: z.array(SyncChange).max(SYNC_BATCH_LIMIT) });
+export type SyncPushRequest = z.infer<typeof SyncPushRequest>;
+
+/**
+ * `GET /v1/sync?since=<cursor>`: changes newer than the cursor, oldest first, with the shows
+ * and episodes they refer to, so a new device can show them without more requests.
+ */
+export type SyncPullResponse = {
+  changes: SyncChange[];
+  cursor: string;
+  hasMore: boolean;
+  podcasts: Podcast[];
+  episodes: Episode[];
+};

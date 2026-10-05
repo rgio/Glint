@@ -101,3 +101,29 @@ export const DEFAULT_SETTINGS: Settings = {
 
 export const ResolveFeedRequest = z.object({ feedUrl: z.url() });
 export type ResolveFeedRequest = z.infer<typeof ResolveFeedRequest>;
+
+// Accounts (F-12): email sign-in with a link (web) or a 6-digit code (phones).
+
+/** Which kind of client is signing in: web keeps the refresh token in an HttpOnly cookie. */
+export const ClientKind = z.enum(['web', 'native']);
+export type ClientKind = z.infer<typeof ClientKind>;
+
+/** Trimmed and lowercased before checking: phone keyboards add trailing spaces and capitals. */
+const EmailAddress = z.string().trim().toLowerCase().pipe(z.email().max(320));
+
+export const EmailSignInStart = z.object({ email: EmailAddress });
+export type EmailSignInStart = z.infer<typeof EmailSignInStart>;
+
+export const EmailSignInVerify = z.union([
+  z.object({ token: z.string().min(20).max(200), client: ClientKind }),
+  z.object({ email: EmailAddress, code: z.string().regex(/^\d{6}$/), client: ClientKind }),
+]);
+export type EmailSignInVerify = z.infer<typeof EmailSignInVerify>;
+
+export const RefreshRequest = z.object({ client: ClientKind, refreshToken: z.string().optional() });
+export type RefreshRequest = z.infer<typeof RefreshRequest>;
+
+export type User = { id: string; email: string; createdAt: string };
+
+/** What sign-in and refresh return. Web clients get the refresh token as a cookie instead. */
+export type AuthSession = { user: User; accessToken: string; accessTokenExpiresAt: string; refreshToken?: string };
