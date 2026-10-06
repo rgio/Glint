@@ -30,6 +30,22 @@ test('show notes render safely, and timestamps play from that point', async ({ a
   await expect(page.getByText(/^Played · /).filter({ visible: true })).toBeVisible();
 });
 
+test('after a reload, a timestamp in the restored episode plays from that timestamp', async ({ app, page }) => {
+  const show = await resolveShow('daily');
+  const [latest] = await episodesOf(show);
+  await app.goto(`/episode/${latest!.id}`);
+  await page.getByLabel('Play from 1:30').click();
+  await app.waitForAudio('!a.paused && a.currentTime >= 90');
+  await page.getByLabel('Pause', { exact: true }).first().click();
+  await app.waitForAudio('a.paused');
+
+  // The episode comes back as current but not yet loaded; the timestamp must win over the
+  // position saved before the reload.
+  await app.goto(`/episode/${latest!.id}`);
+  await page.getByLabel('Play from 4:00').click();
+  await app.waitForAudio('!a.paused && a.currentTime >= 240 && a.currentTime < 250');
+});
+
 test('an unknown episode explains itself', async ({ app, page }) => {
   await app.goto('/episode/ep_missing');
   await expect(page.getByText("This episode isn't available.", { exact: false })).toBeVisible();

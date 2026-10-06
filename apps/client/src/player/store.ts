@@ -47,7 +47,8 @@ type PlayerState = {
   /** Whole seconds until the sleep timer stops playback, for the countdown; null if unknown or off. */
   sleepRemainingSec: number | null;
 
-  playEpisode(episode: PlayableEpisode): Promise<void>;
+  /** Plays `episode` from `startSec`, or else from where the listener left off. */
+  playEpisode(episode: PlayableEpisode, startSec?: number): Promise<void>;
   /** F-05 timestamps: plays `episode` from `seconds`, seeking if it's already loaded. */
   playFrom(episode: PlayableEpisode, seconds: number): void;
   /** Plays `episode` from `startSec` and pauses at `endSec` (a highlight). */
@@ -211,12 +212,12 @@ export const usePlayer = create<PlayerState>()(
           set({ stopAtSec: endSec });
         },
 
-        async playEpisode(episode) {
+        async playEpisode(episode, startSec) {
           set({ stopAtSec: null });
           if (get().current) saveCurrentPosition();
           const saved = get().saved[episode.id];
           // A finished episode starts over; otherwise resume where the listener left off.
-          const startAt = saved && !saved.played ? saved.positionSec : 0;
+          const startAt = startSec ?? (saved && !saved.played ? saved.positionSec : 0);
           set({
             current: episode,
             positionSec: startAt,
@@ -243,9 +244,10 @@ export const usePlayer = create<PlayerState>()(
             if (!playing) audioPlayer.play();
             return;
           }
-          // playEpisode resumes from the saved position, so start there.
-          save(episode.id, { positionSec: seconds, played: false });
-          void get().playEpisode(episode);
+          // Also when `episode` is current but not loaded (after a restart): saving the old
+          // position first must not override where this asks to start.
+          if (get().saved[episode.id]?.played) save(episode.id, { played: false });
+          void get().playEpisode(episode, seconds);
         },
 
         togglePlay() {
