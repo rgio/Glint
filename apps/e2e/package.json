@@ -6,7 +6,8 @@
   "scripts": {
     "e2e": "playwright test",
     "stack": "tsx src/stack.ts",
-    "typecheck": "tsc -p tsconfig.json"
+    "typecheck": "tsc -p tsconfig.json",
+    "e2e:export": "playwright test -c playwright.export.config.ts"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",

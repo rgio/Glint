@@ -6,20 +6,21 @@ import {
   TabTriggerSlotProps,
   TabListProps,
 } from 'expo-router/ui';
-import { Pressable, View, StyleSheet, useWindowDimensions } from 'react-native';
+import { Pressable, View, StyleSheet } from 'react-native';
 
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
 
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { useWindowWidth } from '@/hooks/use-window-width';
 import { badgeText, useUnplayedNewCount } from '@/library/new-episodes';
 
 /** Below this width the brand name is dropped and the tabs share the bar evenly so they fit on a phone. */
 const COMPACT_MAX_WIDTH = 560;
 
 function useCompact() {
-  return useWindowDimensions().width < COMPACT_MAX_WIDTH;
+  return useWindowWidth() < COMPACT_MAX_WIDTH;
 }
 
 export default function AppTabs() {

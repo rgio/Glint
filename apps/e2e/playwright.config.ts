@@ -6,6 +6,8 @@ const CI = !!process.env.CI;
 
 export default defineConfig({
   testDir: 'tests',
+  // The production build has its own config: playwright.export.config.ts.
+  testIgnore: 'export/**',
   timeout: 90_000,
   expect: { timeout: 15_000 },
   // One worker: the tests share one API (in memory) and one Metro bundler.

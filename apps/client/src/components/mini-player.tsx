@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { Platform, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, View } from 'react-native';
 
 import { Artwork } from './artwork';
 import { HighlightButton } from './highlights';
@@ -9,6 +9,7 @@ import { ThemedText } from './themed-text';
 
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { useWindowWidth } from '@/hooks/use-window-width';
 import { formatClock } from '@/lib/format';
 import { usePlayer } from '@/player/store';
 
@@ -18,7 +19,7 @@ const INLINE_SEEK_MIN_WIDTH = 720;
 /** Persistent now-playing bar. Renders nothing until something has been played. */
 export function MiniPlayer({ compact = false }: { compact?: boolean }) {
   const theme = useTheme();
-  const { width: windowWidth } = useWindowDimensions();
+  const windowWidth = useWindowWidth();
   const inlineSeek = Platform.OS === 'web' && !compact && windowWidth >= INLINE_SEEK_MIN_WIDTH;
   const current = usePlayer((s) => s.current);
   const playing = usePlayer((s) => s.playing);

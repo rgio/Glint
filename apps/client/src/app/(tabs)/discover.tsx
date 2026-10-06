@@ -9,7 +9,6 @@ import {
   ScrollView,
   StyleSheet,
   TextInput,
-  useWindowDimensions,
   View,
   type TextStyle,
 } from 'react-native';
@@ -22,6 +21,7 @@ import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { useTheme } from '@/hooks/use-theme';
+import { useWindowWidth } from '@/hooks/use-window-width';
 import { deviceLanguage } from '@/lib/locale';
 
 // Shown when search and charts aren't set up on the server.
@@ -271,7 +271,7 @@ function CategoryChips({
   onSelect: (section: string) => void;
 }) {
   const theme = useTheme();
-  const { width } = useWindowDimensions();
+  const width = useWindowWidth();
   const wrap = Platform.OS === 'web' && width >= WRAP_CHIPS_MIN_WIDTH;
   const byName = new Map(categories.map((c) => [c.name.toLowerCase(), c]));
   const featured = FEATURED_CATEGORIES.map((name) => byName.get(name.toLowerCase())).filter(
