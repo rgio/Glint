@@ -56,6 +56,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @podcast/e2e exec playwright install --with-deps chromium
       - run: pnpm e2e
+      # The production web build (expo export), served with the hosting rules from docs/deploy.md.
+      - run: pnpm e2e:export
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
@@ -64,3 +66,36 @@ jobs:
             apps/e2e/playwright-report
             apps/e2e/test-results
           retention-days: 7
+
+  server-image:
+    name: Server image (build and smoke test)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: podcast
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t podcast-server .
+      - name: Migrate, then start the API and worker with production settings
+        run: |
+          env_args="--network host -e DATABASE_URL=postgres://postgres:postgres@localhost:5432/podcast"
+          docker run --rm $env_args podcast-server migrate
+          docker run -d --name api $env_args -e MIGRATE_ON_START=false -e AUTH_SECRET="$(openssl rand -base64 32)" \
+            -e WEB_URL=https://listen.example.com -e EMAIL_PROVIDER=postmark -e EMAIL_API_KEY=unused -e EMAIL_FROM=a@example.com \
+            podcast-server
+          docker run -d --name worker $env_args podcast-server worker
+          for i in $(seq 1 30); do curl -fsS localhost:4000/ready && break; sleep 1; done
+          curl -fsS localhost:4000/ready
+          curl -sS -o /dev/null localhost:4000/v1/podcasts/missing -w '%{http_code}\n' | grep 404
+          sleep 3 && docker inspect -f '{{.State.Running}}' worker | grep true
+      - if: always()
+        run: docker logs api; docker logs worker

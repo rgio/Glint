@@ -4,44 +4,50 @@ import { migrate, PostgresCatalogStore } from '@podcast/catalog';
 import postgres from 'postgres';
 
 import { buildApp } from './app';
+import { LogEmailSender, PostmarkEmailSender, ResendEmailSender, type EmailSender } from './accounts/email';
 import { PostgresAccountStore } from './accounts/postgres';
+import { loadConfig } from './config';
 import { PodcastIndexDirectory } from './podcast-index';
 
 // Local secrets (see .env.example). Real deployments set the environment directly.
 if (existsSync('.env')) process.loadEnvFile('.env');
 
-const port = Number(process.env.PORT ?? 4000);
-const corsOrigins = process.env.CORS_ORIGINS?.split(',').map((o) => o.trim());
-
-const { PODCAST_INDEX_KEY, PODCAST_INDEX_SECRET, DATABASE_URL, AUTH_SECRET, NODE_ENV } = process.env;
-if (!AUTH_SECRET && NODE_ENV === 'production') {
-  console.error('AUTH_SECRET must be set in production');
+const loaded = loadConfig();
+if ('errors' in loaded) {
+  console.error(`The API can't start; fix these settings:\n${loaded.errors.map((e) => `  - ${e}`).join('\n')}`);
   process.exit(1);
 }
-const directory =
-  PODCAST_INDEX_KEY && PODCAST_INDEX_SECRET
-    ? new PodcastIndexDirectory({ apiKey: PODCAST_INDEX_KEY, apiSecret: PODCAST_INDEX_SECRET })
-    : undefined;
+const { config } = loaded;
 
-const sql = DATABASE_URL ? postgres(DATABASE_URL, { onnotice: () => {} }) : undefined;
-const store = sql ? new PostgresCatalogStore(sql) : undefined;
-const accounts = sql ? new PostgresAccountStore(sql) : undefined;
+const hopsWithin = (hops: number) => (_address: string, hop: number) => hop < hops;
+
+const directory = config.podcastIndex && new PodcastIndexDirectory(config.podcastIndex);
+const sql = config.databaseUrl ? postgres(config.databaseUrl, { onnotice: () => {} }) : undefined;
+
+let email: EmailSender | undefined;
+if (config.email.provider === 'resend') email = new ResendEmailSender(config.email);
+if (config.email.provider === 'postmark') email = new PostmarkEmailSender(config.email);
 
 const app = buildApp({
-  logger: true,
-  corsOrigins,
+  logger: { level: config.logLevel },
+  // A hop count means "trust the nearest N proxies", which Fastify takes as a function.
+  trustProxy: typeof config.trustProxy === 'number' ? hopsWithin(config.trustProxy) : config.trustProxy,
+  corsOrigins: config.corsOrigins,
   directory,
-  store,
-  accounts,
-  authSecret: AUTH_SECRET,
-  webUrl: process.env.WEB_URL,
+  store: sql && new PostgresCatalogStore(sql),
+  accounts: sql && new PostgresAccountStore(sql),
+  email: email ?? new LogEmailSender((message) => app.log.info(message)),
+  authSecret: config.authSecret,
+  webUrl: config.webUrl,
+  ready: sql && (async () => void (await sql`select 1`)),
 });
-if (!AUTH_SECRET) app.log.warn('AUTH_SECRET not set: using a random one, so sign-ins need a refresh after a restart');
+if (!config.authSecret) app.log.warn('AUTH_SECRET not set: using a random one, so sign-ins need a refresh after a restart');
 if (!directory) app.log.warn('PODCAST_INDEX_KEY / PODCAST_INDEX_SECRET not set: search and charts are disabled');
+if (config.email.provider === 'log') app.log.warn('EMAIL_PROVIDER is log: sign-in emails are written to this log, not sent');
 if (sql) {
   app.addHook('onClose', () => sql.end({ timeout: 5 }));
 } else {
-  app.log.warn('DATABASE_URL not set: the catalog is in memory and is lost on restart');
+  app.log.warn('DATABASE_URL not set: the catalog and accounts are in memory and are lost on restart');
 }
 
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
@@ -51,11 +57,11 @@ for (const signal of ['SIGINT', 'SIGTERM'] as const) {
 }
 
 try {
-  if (sql) {
+  if (sql && config.migrateOnStart) {
     const applied = await migrate(sql);
     if (applied.length) app.log.info({ applied }, 'applied database migrations');
   }
-  await app.listen({ port, host: '0.0.0.0' });
+  await app.listen({ port: config.port, host: config.host });
 } catch (err) {
   app.log.error(err);
   await sql?.end({ timeout: 5 });

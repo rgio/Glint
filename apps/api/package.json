@@ -7,11 +7,13 @@
     "dev": "tsx watch src/server.ts",
     "start": "tsx src/server.ts",
     "test": "vitest run",
-    "typecheck": "tsc -p tsconfig.json"
+    "typecheck": "tsc -p tsconfig.json",
+    "migrate": "tsx src/migrate.ts"
   },
   "dependencies": {
     "@fastify/cookie": "^11.1.2",
     "@fastify/cors": "^11.0.0",
+    "@fastify/rate-limit": "^11.2.0",
     "@podcast/catalog": "workspace:*",
     "@podcast/feed-parser": "workspace:*",
     "@podcast/shared": "workspace:*",

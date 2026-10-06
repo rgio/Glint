@@ -69,6 +69,8 @@ const app = buildApp({
   fetchFeed,
   webUrl: WEB_URL,
   authSecret: 'e2e-secret',
+  // Every test signs in from this machine; production limits would lock later tests out.
+  rateLimit: false,
   email: {
     async sendSignIn(to, { code, link }) {
       sentEmails.set(to, { code, link });

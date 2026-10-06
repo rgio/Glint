@@ -30,6 +30,15 @@ const ACCESS_TTL_MS = 15 * MINUTE;
 const REFRESH_TTL_MS = 90 * 24 * 60 * MINUTE;
 const REFRESH_COOKIE = 'refresh_token';
 const PULL_LIMIT = 500;
+/**
+ * Per client address, on top of the per-email limits: sign-in emails cost money and reputation,
+ * and codes are guessable in bulk across many requests. Generous enough for a shared office IP.
+ */
+const AUTH_RATE_LIMITS = {
+  start: { max: 20, timeWindow: '15 minutes' },
+  verify: { max: 40, timeWindow: '15 minutes' },
+  refresh: { max: 120, timeWindow: '15 minutes' },
+};
 
 export type AccountDeps = {
   accounts: AccountStore;
@@ -116,7 +125,7 @@ export function registerAccountRoutes(app: FastifyInstance, deps: AccountDeps) {
   };
 
   // Always 204, whether or not the address has an account, so this can't be used to find accounts.
-  app.post('/v1/auth/email/start', async (req, reply) => {
+  app.post('/v1/auth/email/start', { config: { rateLimit: AUTH_RATE_LIMITS.start } }, async (req, reply) => {
     const address = EmailSignInStart.parse(req.body).email;
     const recent = await accounts.countSignInRequestsSince(address, new Date(now() - SIGN_IN_TTL_MS));
     if (recent >= SIGN_IN_LIMIT) {
@@ -137,7 +146,7 @@ export function registerAccountRoutes(app: FastifyInstance, deps: AccountDeps) {
     return reply.status(204).send();
   });
 
-  app.post('/v1/auth/email/verify', async (req, reply) => {
+  app.post('/v1/auth/email/verify', { config: { rateLimit: AUTH_RATE_LIMITS.verify } }, async (req, reply) => {
     const body = EmailSignInVerify.parse(req.body);
     const invalid = () => new AuthError(400, 'invalid_sign_in', 'That link or code is invalid or has expired.');
 
@@ -164,7 +173,7 @@ export function registerAccountRoutes(app: FastifyInstance, deps: AccountDeps) {
     return startSession(reply, req, user, body.client);
   });
 
-  app.post('/v1/auth/refresh', async (req, reply) => {
+  app.post('/v1/auth/refresh', { config: { rateLimit: AUTH_RATE_LIMITS.refresh } }, async (req, reply) => {
     const { client, refreshToken: fromBody } = RefreshRequest.parse(req.body ?? {});
     const presented = client === 'web' ? req.cookies[REFRESH_COOKIE] : fromBody;
     const unauthorized = () => new AuthError(401, 'unauthorized', 'Sign in again.');
