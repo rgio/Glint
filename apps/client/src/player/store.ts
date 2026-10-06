@@ -1,5 +1,6 @@
 import {
   clampRate,
+  RATE_STEP,
   POSITION_SAVE_INTERVAL_MS,
   shouldMarkPlayed,
   sleepFadeVolume,
@@ -7,6 +8,7 @@ import {
   sortKeyAfter,
   sortKeyBefore,
   sortKeyBetween,
+  type SkipInterval,
   type SleepTimer,
 } from '@podcast/shared';
 import { AppState } from 'react-native';
@@ -21,7 +23,8 @@ import type { PlayableEpisode } from './types';
 export type QueueEntry = PlayableEpisode & { sortKey: string };
 export type SavedState = { positionSec: number; played: boolean; updatedAt: number };
 
-const RATE_PRESETS = [1, 1.2, 1.5, 1.8, 2, 2.5, 3];
+/** Speeds offered as one-tap choices in the speed options. */
+export const RATE_PRESETS = [0.8, 1, 1.2, 1.5, 1.8, 2, 2.5, 3];
 
 type PlayerState = {
   current: PlayableEpisode | null;
@@ -55,7 +58,11 @@ type PlayerState = {
   seekTo(seconds: number): void;
   skipBack(): void;
   skipForward(): void;
-  cycleRate(): void;
+  /** Sets the speed, clamped to what this device's player supports. */
+  setRate(rate: number): void;
+  /** Speeds up (1) or slows down (-1) by 0.1x. */
+  stepRate(direction: -1 | 1): void;
+  setSkipIntervals(intervals: { back?: SkipInterval; forward?: SkipInterval }): void;
   playNext(episode: PlayableEpisode): void;
   playLast(episode: PlayableEpisode): void;
   removeFromQueue(episodeId: string): void;
@@ -272,12 +279,21 @@ export const usePlayer = create<PlayerState>()(
           get().seekTo(get().positionSec + get().skipForwardSec);
         },
 
-        cycleRate() {
-          const presets = RATE_PRESETS.filter((r) => r <= audioPlayer.maxRate);
-          const next = presets.find((r) => r > get().rate) ?? presets[0] ?? 1;
-          const rate = clampRate(next, audioPlayer.maxRate);
+        setRate(value) {
+          const rate = clampRate(value, audioPlayer.maxRate);
           audioPlayer.setRate(rate);
           set({ rate });
+        },
+
+        stepRate(direction) {
+          get().setRate(get().rate + direction * RATE_STEP);
+        },
+
+        setSkipIntervals({ back, forward }) {
+          const skipBackSec = back ?? get().skipBackSec;
+          const skipForwardSec = forward ?? get().skipForwardSec;
+          audioPlayer.setSkipIntervals(skipBackSec, skipForwardSec);
+          set({ skipBackSec, skipForwardSec });
         },
 
         playNext(episode) {

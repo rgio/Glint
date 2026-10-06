@@ -56,11 +56,21 @@ export async function verifySignIn(input: { email: string; code: string } | { to
 }
 
 /**
+ * Refresh tokens are single-use, and on web every tab shares the one cookie: two tabs
+ * refreshing at once would send the same token and the slower one would be signed out.
+ * A Web Lock makes tabs take turns, so the second sends the cookie the first just rotated.
+ */
+function oneTabAtATime<T>(task: () => Promise<T>): Promise<T> {
+  const locks = typeof navigator !== 'undefined' ? navigator.locks : undefined;
+  return locks ? locks.request('podcast-auth-refresh', task) : task();
+}
+
+/**
  * Gets a new access token from the refresh token. Resolves false when the server says the
  * session is over (and signs out locally); throws on network errors, keeping the session.
  */
 function refresh(): Promise<boolean> {
-  refreshing ??= (async () => {
+  refreshing ??= oneTabAtATime(async () => {
     try {
       const refreshToken = await loadRefreshToken();
       if (CLIENT === 'native' && !refreshToken) {
@@ -82,7 +92,7 @@ function refresh(): Promise<boolean> {
     } finally {
       refreshing = null;
     }
-  })();
+  });
   return refreshing;
 }
 

@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Artwork } from '@/components/artwork';
@@ -9,6 +9,7 @@ import { HighlightButton } from '@/components/highlights';
 import { Scrubber } from '@/components/scrubber';
 import { ShareButton } from '@/components/share-button';
 import { SleepTimerButton, SleepTimerOptions } from '@/components/sleep-timer';
+import { SpeedButton, SpeedOptions } from '@/components/speed';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
@@ -22,11 +23,12 @@ export default function PlayerScreen() {
   const playing = usePlayer((s) => s.playing);
   const buffering = usePlayer((s) => s.buffering);
   const error = usePlayer((s) => s.error);
-  const rate = usePlayer((s) => s.rate);
   const skipBackSec = usePlayer((s) => s.skipBackSec);
   const skipForwardSec = usePlayer((s) => s.skipForwardSec);
-  const { togglePlay, skipBack, skipForward, cycleRate } = usePlayer.getState();
-  const [sleepOptionsOpen, setSleepOptionsOpen] = useState(false);
+  const { togglePlay, skipBack, skipForward } = usePlayer.getState();
+  // One options panel at a time: speed or the sleep timer.
+  const [panel, setPanel] = useState<'speed' | 'sleep' | null>(null);
+  const toggle = (which: 'speed' | 'sleep') => setPanel((open) => (open === which ? null : which));
 
   // Nothing to show (e.g. a deep link to /player before anything played).
   useEffect(() => {
@@ -71,18 +73,13 @@ export default function PlayerScreen() {
         </View>
 
         <View style={styles.secondary}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`Playback speed ${rate}x. Change speed`}
-            onPress={cycleRate}
-            style={({ pressed }) => [styles.rate, { backgroundColor: theme.backgroundElement }, pressed && styles.pressed]}>
-            <ThemedText type="smallBold">{`${rate}x`}</ThemedText>
-          </Pressable>
-          <SleepTimerButton open={sleepOptionsOpen} onPress={() => setSleepOptionsOpen((open) => !open)} />
+          <SpeedButton open={panel === 'speed'} onPress={() => toggle('speed')} />
+          <SleepTimerButton open={panel === 'sleep'} onPress={() => toggle('sleep')} />
           <HighlightButton source="player" variant="pill" />
           <ShareButton episode={current} />
         </View>
-        {sleepOptionsOpen && <SleepTimerOptions onChoose={() => setSleepOptionsOpen(false)} />}
+        {panel === 'speed' && <SpeedOptions />}
+        {panel === 'sleep' && <SleepTimerOptions onChoose={() => setPanel(null)} />}
 
         {error && (
           <ThemedText type="small" style={{ color: theme.danger }} accessibilityLiveRegion="polite">
@@ -103,6 +100,4 @@ const styles = StyleSheet.create({
   controls: { flexDirection: 'row', alignItems: 'center', gap: Spacing.five },
   playButton: { width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center' },
   secondary: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: Spacing.three },
-  rate: { minWidth: 64, minHeight: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', paddingHorizontal: Spacing.three },
-  pressed: { opacity: 0.6 },
 });

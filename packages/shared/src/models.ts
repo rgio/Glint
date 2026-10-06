@@ -78,6 +78,10 @@ export const QueueItem = z.object({
 });
 export type QueueItem = z.infer<typeof QueueItem>;
 
+/** The skip intervals the app offers, in seconds. */
+export const SKIP_INTERVALS = [10, 15, 30] as const;
+export type SkipInterval = (typeof SKIP_INTERVALS)[number];
+
 export const Settings = z.object({
   skipBackSec: z.union([z.literal(10), z.literal(15), z.literal(30)]),
   skipForwardSec: z.union([z.literal(10), z.literal(15), z.literal(30)]),
