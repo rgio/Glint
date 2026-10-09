@@ -33,7 +33,7 @@ describe('PodcastIndexDirectory', () => {
 
     const [url, init] = fetch.mock.calls[0]!;
     expect(String(url)).toBe(
-      'https://api.podcastindex.org/api/1.0/search/byterm?q=batman+university&max=10&clean=true',
+      'https://api.podcastindex.org/api/1.0/search/byterm?q=batman+university&max=10',
     );
     const headers = init?.headers as Record<string, string>;
     const date = String(NOW / 1000);

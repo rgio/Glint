@@ -75,7 +75,9 @@ export class PodcastIndexDirectory implements PodcastDirectory {
   }
 
   search(query: string, limit: number) {
-    const params = new URLSearchParams({ q: query, max: String(limit), clean: 'true' });
+    // No `clean`: it drops every show marked explicit, which hides many popular shows from
+    // search (e.g. Normal Gossip). Charts don't filter them either.
+    const params = new URLSearchParams({ q: query, max: String(limit) });
     return this.cached(`search:${params}`, TTL_MS.search, async () => {
       const body = await this.get<{ feeds?: PiFeed[] }>('/search/byterm', params);
       return (body.feeds ?? []).map(toDirectoryPodcast).filter((p) => p !== null);
