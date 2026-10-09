@@ -6,6 +6,7 @@ import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
 
 import { BottomTabInset, MaxContentWidth, Spacing, WebPlayerHeight, WebTabBarHeight } from '@/constants/theme';
+import { FloatingPlayerGap, FloatingPlayerHeight, usesFloatingPlayer } from '@/player/placement';
 import { usePlayer } from '@/player/store';
 
 /** Padding that keeps content clear of the tab bar, mini player and notches on each platform. */
@@ -18,10 +19,10 @@ export function useContentInsets() {
       paddingBottom: (hasEpisode ? WebPlayerHeight : 0) + Spacing.four,
     };
   }
-  const androidPlayer = Platform.OS === 'android' && hasEpisode ? 64 : 0;
+  const floatingPlayer = usesFloatingPlayer && hasEpisode ? FloatingPlayerHeight + FloatingPlayerGap : 0;
   return {
     paddingTop: safe.top + Spacing.three,
-    paddingBottom: safe.bottom + BottomTabInset + androidPlayer + Spacing.four,
+    paddingBottom: safe.bottom + BottomTabInset + floatingPlayer + Spacing.four,
   };
 }
 

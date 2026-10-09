@@ -1,11 +1,13 @@
 import { usePathname } from 'expo-router';
 import { NativeTabs } from 'expo-router/unstable-native-tabs';
 import { Platform, StyleSheet, useColorScheme, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { MiniPlayer } from './mini-player';
 
 import { BottomTabInset, Colors } from '@/constants/theme';
 import { badgeText, useUnplayedNewCount } from '@/library/new-episodes';
+import { FloatingPlayerGap, FloatingPlayerHeight, usesFloatingPlayer, usesTabBarAccessory } from '@/player/placement';
 import { usePlayer } from '@/player/store';
 
 function AccessoryPlayer() {
@@ -20,6 +22,9 @@ export default function AppTabs() {
   // F-11: new, unplayed episodes, shown on the Home tab while another tab is open.
   const homeBadge = badgeText(useUnplayedNewCount());
   const onHome = usePathname() === '/';
+  // The tab bar sits above the home indicator on iPhones; Android's inset already covers it.
+  const safeBottom = useSafeAreaInsets().bottom;
+  const floatingBottom = BottomTabInset + FloatingPlayerGap + (Platform.OS === 'ios' ? safeBottom : 0);
 
   return (
     <View style={styles.fill}>
@@ -45,16 +50,16 @@ export default function AppTabs() {
           <NativeTabs.Trigger.Icon sf="list.bullet" md="queue_music" />
         </NativeTabs.Trigger>
 
-        {/* iOS shows the mini player as the tab bar's bottom accessory. */}
-        {Platform.OS === 'ios' && hasEpisode && (
+        {/* iOS 26+ shows the mini player as the tab bar's bottom accessory. */}
+        {usesTabBarAccessory && hasEpisode && (
           <NativeTabs.BottomAccessory>
             <AccessoryPlayer />
           </NativeTabs.BottomAccessory>
         )}
       </NativeTabs>
 
-      {Platform.OS === 'android' && hasEpisode && (
-        <View style={[styles.androidPlayer, { backgroundColor: colors.backgroundElement }]}>
+      {usesFloatingPlayer && hasEpisode && (
+        <View style={[styles.floatingPlayer, { bottom: floatingBottom, backgroundColor: colors.backgroundElement }]}>
           <MiniPlayer />
         </View>
       )}
@@ -64,12 +69,11 @@ export default function AppTabs() {
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },
-  androidPlayer: {
+  floatingPlayer: {
     position: 'absolute',
     left: 8,
     right: 8,
-    bottom: BottomTabInset + 8,
-    height: 56,
+    height: FloatingPlayerHeight,
     borderRadius: 12,
     overflow: 'hidden',
   },
