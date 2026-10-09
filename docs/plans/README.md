@@ -8,6 +8,7 @@ Everything planned and decided in the 2026-10-01 Claude Code session that specce
 | [02-v1-scope-decisions.md](02-v1-scope-decisions.md) | What Rob decided: Expo, v1 cuts, push and car support at P2, repo location, Node backend |
 | [03-implementation-plan.md](03-implementation-plan.md) | How the code is laid out, where it differs from the spec (notably `expo-audio` instead of track-player, and no local DB yet), and what was verified |
 | [04-status-and-todos.md](04-status-and-todos.md) | Every P0 feature and infra item marked done / partial / not started, the suggested next steps, and open questions |
+| [05-highlights-spec.md](05-highlights-spec.md) | The highlights and notes feature: capture, review, transcripts (dLogos), sync, the audio-stack constraint, phasing and open questions |
 
 ## Where things stand
 
@@ -27,4 +28,4 @@ pnpm test && pnpm typecheck
 
 ## Source of truth
 
-The living spec is a Claude Doc: https://claude.ai/code/artifact/87e6afa3-a9ab-49ce-9d09-11f69cb6ad30. `01-product-spec.md` is a snapshot of revision 24. Update the status file as features land.
+The living spec is a Claude Doc: https://claude.ai/code/artifact/87e6afa3-a9ab-49ce-9d09-11f69cb6ad30. `01-product-spec.md` is a snapshot of revision 24. The highlights spec is a separate Claude Doc, https://claude.ai/code/artifact/327993cb-107f-4d29-b1e0-945835601934; `05-highlights-spec.md` is a snapshot of revision 25. Update the status file as features land.
