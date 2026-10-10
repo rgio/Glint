@@ -1,0 +1,82 @@
+diff --git a/android/src/main/java/expo/modules/audio/AudioPlayer.kt b/android/src/main/java/expo/modules/audio/AudioPlayer.kt
+index c76a9fd2a53743a691782e0f67d0d71401df58f6..7ae1f10d36897811edb4b8f5608e0f656ec11686 100644
+--- a/android/src/main/java/expo/modules/audio/AudioPlayer.kt
++++ b/android/src/main/java/expo/modules/audio/AudioPlayer.kt
+@@ -24,7 +24,7 @@ import java.lang.ref.WeakReference
+ 
+ private const val PLAYBACK_STATUS_UPDATE = "playbackStatusUpdate"
+ private const val AUDIO_SAMPLE_UPDATE = "audioSampleUpdate"
+-private const val SEEK_JUMP_INTERVAL_MS: Long = 10_000
++private const val SEEK_JUMP_INTERVAL_MS: Long = 30_000
+ 
+ @UnstableApi
+ class AudioPlayer(
+diff --git a/android/src/main/java/expo/modules/audio/service/AudioControlsService.kt b/android/src/main/java/expo/modules/audio/service/AudioControlsService.kt
+index 196a5d57f887c2667a88543bd2f6a80044a044f2..1afd93f9a32e4dd01e5c6965084e56b5758847a2 100644
+--- a/android/src/main/java/expo/modules/audio/service/AudioControlsService.kt
++++ b/android/src/main/java/expo/modules/audio/service/AudioControlsService.kt
+@@ -559,6 +559,6 @@ class AudioControlsService : MediaSessionService() {
+     const val ACTION_SEEK_FORWARD = "expo.modules.audio.action.SEEK_FORWARD"
+     const val ACTION_SEEK_BACKWARD = "expo.modules.audio.action.SEEK_BACKWARD"
+ 
+-    const val SEEK_INTERVAL_MS = 10000L
++    const val SEEK_INTERVAL_MS = 30000L
+   }
+ }
+diff --git a/ios/MediaController.swift b/ios/MediaController.swift
+index e977f577cd2e16b194b56537ad76b423f40d2496..a1fde3a78c4e156b060793c576a41143a13db7ab 100644
+--- a/ios/MediaController.swift
++++ b/ios/MediaController.swift
+@@ -232,6 +232,10 @@ class MediaController {
+   }
+ 
+   private func enableRemoteCommands(options: LockScreenOptions?) {
++    // Each call adds closure targets, so drop the previous ones first; otherwise a second
++    // setActiveForLockScreen leaves two handlers and toggle play/pause cancels itself out.
++    removeRemoteCommandTargets()
++
+     remoteCommandCenter.playCommand.addTarget { [weak self] _ in
+       guard let player = self?.activePlayer else {
+         return .commandFailed
+@@ -275,7 +279,7 @@ class MediaController {
+       return .success
+     }
+ 
+-    remoteCommandCenter.skipForwardCommand.preferredIntervals = [10.0]
++    remoteCommandCenter.skipForwardCommand.preferredIntervals = [30.0]
+     remoteCommandCenter.skipForwardCommand.addTarget { [weak self] event in
+       guard let player = self?.activePlayer,
+       let event = event as? MPSkipIntervalCommandEvent else {
+@@ -289,7 +293,7 @@ class MediaController {
+       return .success
+     }
+ 
+-    remoteCommandCenter.skipBackwardCommand.preferredIntervals = [10.0]
++    remoteCommandCenter.skipBackwardCommand.preferredIntervals = [30.0]
+     remoteCommandCenter.skipBackwardCommand.addTarget { [weak self] event in
+       guard let player = self?.activePlayer,
+       let event = event as? MPSkipIntervalCommandEvent else {
+@@ -319,12 +323,16 @@ class MediaController {
+     remoteCommandCenter.skipForwardCommand.isEnabled = false
+     remoteCommandCenter.skipBackwardCommand.isEnabled = false
+ 
+-    // Remove event targets
+-    remoteCommandCenter.playCommand.removeTarget(self)
+-    remoteCommandCenter.pauseCommand.removeTarget(self)
+-    remoteCommandCenter.togglePlayPauseCommand.removeTarget(self)
+-    remoteCommandCenter.changePlaybackPositionCommand.removeTarget(self)
+-    remoteCommandCenter.skipForwardCommand.removeTarget(self)
+-    remoteCommandCenter.skipBackwardCommand.removeTarget(self)
++    removeRemoteCommandTargets()
++  }
++
++  // The targets are closures, not `self`, so removeTarget(self) never matched them; nil removes all.
++  private func removeRemoteCommandTargets() {
++    remoteCommandCenter.playCommand.removeTarget(nil)
++    remoteCommandCenter.pauseCommand.removeTarget(nil)
++    remoteCommandCenter.togglePlayPauseCommand.removeTarget(nil)
++    remoteCommandCenter.changePlaybackPositionCommand.removeTarget(nil)
++    remoteCommandCenter.skipForwardCommand.removeTarget(nil)
++    remoteCommandCenter.skipBackwardCommand.removeTarget(nil)
+   }
+ }
