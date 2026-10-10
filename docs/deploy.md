@@ -8,8 +8,9 @@ Host-agnostic notes for running the app in production. Nothing here depends on a
 | --- | --- | --- |
 | API | Fastify server (`apps/api`) | The server image, command `api` (the default). Listens on `$PORT` (4000). |
 | Feed worker | Polls feeds on a schedule (`apps/feed-worker`) | The same image, command `worker`. One or more instances; they share work safely. |
+| Content worker | Transcripts (dLogos, publisher), highlight excerpts, embeddings, recommendations (`apps/content-worker`) | The same image, command `content`. One or more instances; jobs are leased, so they share work safely. |
 | Migrations | SQL in `packages/catalog/src/db/migrations` | Applied by the API on start, or by the image's `migrate` command as a release step (then set `MIGRATE_ON_START=false`). |
-| Database | PostgreSQL 16 | A managed service. |
+| Database | PostgreSQL 16 with the **pgvector** extension (0.7+, for `halfvec`; 0.8+ recommended) | A managed service that offers pgvector (most major ones do; confirm for the shortlist when choosing a host). Migration 009 runs `create extension vector`, so the database user needs permission to create it, or create it once by hand. |
 | Web app | Static files from `expo export` | Any static host or CDN, with the rewrite rules below. |
 | Phone apps | iOS and Android builds | EAS Build (needs the Apple and Google accounts in `TODO.md`). |
 
@@ -19,6 +20,7 @@ Host-agnostic notes for running the app in production. Nothing here depends on a
 docker build -t podcast-server .
 docker run --env-file prod.env -p 4000:4000 podcast-server            # API
 docker run --env-file prod.env podcast-server worker                    # feed worker
+docker run --env-file prod.env podcast-server content                   # content worker
 docker run --env-file prod.env podcast-server migrate                   # migrations only
 ```
 
@@ -47,6 +49,22 @@ Set these in the host's secret settings. In production (`NODE_ENV=production`, w
 | `PORT`, `HOST`, `LOG_LEVEL` | Optional | `4000`, `0.0.0.0`, `info`. |
 
 The feed worker needs only `DATABASE_URL`.
+
+### Content worker settings
+
+Checked on start like the API's: it refuses to run, listing every problem.
+
+| Setting | Notes |
+| --- | --- |
+| `DATABASE_URL` | Required. The same database as the API. |
+| `DLOGOS_API_KEY` | The main transcript source. Without it, only publisher (`podcast:transcript`) transcripts are fetched. Shows must be mapped to their dLogos slug: `pnpm --filter @podcast/content-worker cli map-dlogos <feed URL> <slug>`. |
+| `DLOGOS_SEED_DAILY_BUDGET` | dLogos requests per day spent building the discovery corpus. Default `0`: transcripts are only requested for highlighted episodes. |
+| `DLOGOS_REQUEST_DAILY_BUDGET` | dLogos requests per day triggered by highlights, default `500`. Over it, requests wait for the next day (logged as a warning). |
+| `EMBEDDINGS_PROVIDER` | `off` (default), `openai`, or `hashing` (local testing only; refused in production). `openai` sends episode text and listeners' highlight notes to OpenAI: update the privacy policy first. |
+| `OPENAI_API_KEY` | Required with `openai`. |
+| `HNSW_EF_SEARCH` | Optional. Raise it if the nightly recall check (in the worker log, `vector index recall check`) drops below about 0.95. |
+
+The worker logs vector searches slower than 100 ms, or filtered searches that came back short, as warnings. Together with the nightly recall check and index size, those are the signals for moving vectors to a dedicated store; see "Vector storage" in `docs/plans/06-data-layer-plan.md`.
 
 ### Built-in protection
 
@@ -83,9 +101,13 @@ The host must:
 
 1. `pnpm lint && pnpm typecheck && pnpm test && pnpm e2e && pnpm e2e:export`, or a green CI run.
 2. Build and push the server image; run `migrate` (or let the API do it).
-3. Deploy the API, then the worker.
+3. Deploy the API, then the feed and content workers.
 4. Build and upload the web app.
 5. Check `/ready`, sign in with a real address (the email arrives), and open a shared link.
+
+## Local Postgres with pgvector
+
+The tests and the content layer need pgvector in your local Postgres. Homebrew's `pgvector` formula is built for specific Postgres versions (in October 2026: 14 and 17), so match your server to it. To check: `psql -c "create extension if not exists vector"` in your database.
 
 ## Not yet done
 

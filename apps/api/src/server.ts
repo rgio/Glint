@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs';
 
 import { migrate, PostgresCatalogStore } from '@podcast/catalog';
+import { PostgresJobQueue, PostgresTranscriptStore, PostgresUserDataStore } from '@podcast/content';
 import postgres from 'postgres';
 
 import { buildApp } from './app';
@@ -40,6 +41,11 @@ const app = buildApp({
   authSecret: config.authSecret,
   webUrl: config.webUrl,
   ready: sql && (async () => void (await sql`select 1`)),
+  content: sql && {
+    transcripts: new PostgresTranscriptStore(sql),
+    jobs: new PostgresJobQueue(sql),
+    userData: new PostgresUserDataStore(sql),
+  },
 });
 if (!config.authSecret) app.log.warn('AUTH_SECRET not set: using a random one, so sign-ins need a refresh after a restart');
 if (!directory) app.log.warn('PODCAST_INDEX_KEY / PODCAST_INDEX_SECRET not set: search and charts are disabled');

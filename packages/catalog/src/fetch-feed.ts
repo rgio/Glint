@@ -53,7 +53,7 @@ async function assertPublicUrl(url: URL): Promise<void> {
   }
 }
 
-async function readLimited(res: Response): Promise<string> {
+async function readLimited(res: Response, maxBytes = MAX_BYTES): Promise<string> {
   const reader = res.body?.getReader();
   if (!reader) return '';
   const chunks: Uint8Array[] = [];
@@ -62,9 +62,9 @@ async function readLimited(res: Response): Promise<string> {
     const { done, value } = await reader.read();
     if (done) break;
     total += value.byteLength;
-    if (total > MAX_BYTES) {
+    if (total > maxBytes) {
       await reader.cancel();
-      throw new FeedFetchError('Feed is larger than 20 MB');
+      throw new FeedFetchError(`Response is larger than ${Math.round(maxBytes / 1024 / 1024)} MB`);
     }
     chunks.push(value);
   }
@@ -108,3 +108,29 @@ export const fetchFeed: FetchFeed = async (input, cache) => {
   }
   throw new FeedFetchError('Too many redirects');
 };
+
+/**
+ * GETs a URL that came from a feed (a transcript or chapters file), with the same guards as feeds:
+ * public hosts only, every redirect checked, a timeout and a size limit.
+ */
+export async function fetchPublicText(input: string, opts: { accept?: string; maxBytes?: number } = {}): Promise<string> {
+  let url = new URL(input);
+  const headers = { 'User-Agent': USER_AGENT, Accept: opts.accept ?? '*/*' };
+  for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+    await assertPublicUrl(url);
+    let res: Response;
+    try {
+      res = await fetch(url, { headers, redirect: 'manual', signal: AbortSignal.timeout(TIMEOUT_MS) });
+    } catch (err) {
+      throw new FeedFetchError(`Could not reach ${url.host}: ${(err as Error).message}`);
+    }
+    const location = res.headers.get('location');
+    if (res.status >= 300 && res.status < 400 && location) {
+      url = new URL(location, url);
+      continue;
+    }
+    if (!res.ok) throw new FeedFetchError(`${url.host} returned HTTP ${res.status}`);
+    return readLimited(res, opts.maxBytes);
+  }
+  throw new FeedFetchError('Too many redirects');
+}

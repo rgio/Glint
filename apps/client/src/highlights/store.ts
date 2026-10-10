@@ -61,7 +61,7 @@ export const useHighlights = create<HighlightsState>()(
           });
 
           if (range.kind === 'extend' && get().items[range.id] && !get().items[range.id]!.deleted) {
-            update(range.id, { startSec: range.startSec, endSec: range.endSec, rangeUpdatedAt: now });
+            update(range.id, { startSec: range.startSec, endSec: range.endSec, rangeUpdatedAt: now, transcriptExcerpt: null, chapterTitle: null, transcriptConfidence: null });
             set({ lastCapture: { ...get().lastCapture!, startSec: range.startSec, endSec: range.endSec, capturedAt: now }, toast: { kind: 'captured', id: range.id, at: now } });
             return get().items[range.id]!;
           }
@@ -108,7 +108,8 @@ export const useHighlights = create<HighlightsState>()(
             if (start !== h.startSec) start = end - HIGHLIGHT_MAX_SEC;
             else end = start + HIGHLIGHT_MAX_SEC;
           }
-          update(id, { startSec: start, endSec: end, rangeUpdatedAt: Date.now() });
+          // The excerpt and chapter belonged to the old range; the server recomputes them.
+          update(id, { startSec: start, endSec: end, rangeUpdatedAt: Date.now(), transcriptExcerpt: null, chapterTitle: null, transcriptConfidence: null });
         },
 
         remove(id) {

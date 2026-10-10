@@ -45,6 +45,9 @@ const episode = (id: string, publishedAt: string | null, extra: Partial<Episode>
   artworkUrl: null,
   season: 2,
   episodeNumber: 7,
+  transcriptUrl: 'https://example.com/t.json',
+  transcriptType: 'application/json',
+  chaptersUrl: null,
   ...extra,
 });
 

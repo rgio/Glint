@@ -46,23 +46,38 @@ export function lastWriteWins<T extends Subscription | QueueItem | Settings>(a: 
  * Highlights merge field by field: the range and the note each keep the newer edit, so editing
  * the note on one device while adjusting the range on another keeps both. A deletion wins.
  * Ties go to the larger value, so the result doesn't depend on which side is `a`.
+ *
+ * The excerpt, chapter and confidence are derived from the range on the server, so they follow
+ * the winning range. When both sides have the same range and only one has them (the server filled
+ * them in after the client last saw the highlight), they're taken from that side.
  */
 export function mergeHighlight(a: Highlight, b: Highlight): Highlight {
   const newer = <T>(at: number, bt: number, av: T, bv: T) =>
     at !== bt ? (at > bt ? av : bv) : JSON.stringify(av) >= JSON.stringify(bv) ? av : bv;
   const range = newer(a.rangeUpdatedAt, b.rangeUpdatedAt, a, b);
   const note = newer(a.noteUpdatedAt, b.noteUpdatedAt, a, b);
+  const other = range === a ? b : a;
+  const sameRange =
+    other.rangeUpdatedAt === range.rangeUpdatedAt && other.startSec === range.startSec && other.endSec === range.endSec;
+  const derived = range.transcriptExcerpt === null && sameRange && other.transcriptExcerpt !== null ? other : range;
   return {
     ...range,
     startSec: range.startSec,
     endSec: range.endSec,
-    transcriptExcerpt: range.transcriptExcerpt ?? note.transcriptExcerpt,
+    transcriptExcerpt: derived.transcriptExcerpt,
+    chapterTitle: derived.chapterTitle,
+    transcriptConfidence: derived.transcriptConfidence ?? null,
     rangeUpdatedAt: range.rangeUpdatedAt,
     note: note.note,
     noteUpdatedAt: note.noteUpdatedAt,
     createdAt: Math.min(a.createdAt, b.createdAt),
     deleted: a.deleted || b.deleted,
   };
+}
+
+/** Strips the server-owned fields from a highlight a client sent. */
+export function withoutDerivedFields(h: Highlight): Highlight {
+  return { ...h, transcriptExcerpt: null, chapterTitle: null, transcriptConfidence: null };
 }
 
 /** A change recorded in the client outbox and sent to `POST /v1/sync`. */

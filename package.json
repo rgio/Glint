@@ -5,8 +5,9 @@
   "scripts": {
     "dev:api": "pnpm --filter @podcast/api dev",
     "dev:worker": "pnpm --filter @podcast/feed-worker dev",
+    "dev:content": "pnpm --filter @podcast/content-worker dev",
     "dev:client": "pnpm --filter @podcast/client start",
-    "test": "turbo run test",
+    "test": "turbo run test --concurrency=1",
     "e2e": "pnpm --filter @podcast/e2e e2e",
     "typecheck": "turbo run typecheck",
     "lint": "turbo run lint",

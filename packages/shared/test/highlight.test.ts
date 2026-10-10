@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { changeKey, mergeHighlight, SyncChange, type Highlight } from '../src';
+import { changeKey, mergeHighlight, SyncChange, withoutDerivedFields, type Highlight } from '../src';
 
 const base: Highlight = {
   id: '6a6f0b4e-8a4a-4c8e-9f0e-1d2c3b4a5f60',
@@ -40,6 +40,29 @@ describe('mergeHighlight', () => {
     const x = { ...base, note: 'a', noteUpdatedAt: 5000 };
     const y = { ...base, note: 'b', noteUpdatedAt: 5000 };
     expect(mergeHighlight(x, y)).toEqual(mergeHighlight(y, x));
+  });
+});
+
+describe('server-owned excerpts', () => {
+  const filled = { ...base, transcriptExcerpt: 'the words', chapterTitle: 'Intro', transcriptConfidence: 'exact' as const };
+
+  it('takes the excerpt the server filled in when the range is the same', () => {
+    expect(mergeHighlight(base, filled)).toMatchObject({ transcriptExcerpt: 'the words', chapterTitle: 'Intro', transcriptConfidence: 'exact' });
+    expect(mergeHighlight(filled, base)).toEqual(mergeHighlight(base, filled));
+  });
+
+  it('keeps the note edit while taking the filled excerpt', () => {
+    const noted = { ...base, note: 'mine', noteUpdatedAt: 4000 };
+    expect(mergeHighlight(noted, filled)).toMatchObject({ note: 'mine', transcriptExcerpt: 'the words' });
+  });
+
+  it('drops an excerpt that belongs to an older range', () => {
+    const moved = { ...base, startSec: 80, rangeUpdatedAt: 5000 };
+    expect(mergeHighlight(filled, moved)).toMatchObject({ startSec: 80, transcriptExcerpt: null, chapterTitle: null });
+  });
+
+  it('withoutDerivedFields clears what clients must not set', () => {
+    expect(withoutDerivedFields(filled)).toMatchObject({ transcriptExcerpt: null, chapterTitle: null, transcriptConfidence: null });
   });
 });
 

@@ -50,6 +50,9 @@ function toEpisodes(podcastId: string, feed: ParsedFeed): Episode[] {
     artworkUrl: e.artworkUrl,
     season: e.season,
     episodeNumber: e.episodeNumber,
+    transcriptUrl: e.transcriptUrl,
+    transcriptType: e.transcriptType,
+    chaptersUrl: e.chaptersUrl,
   }));
 }
 

@@ -11,6 +11,7 @@ import {
   type CatalogStore,
   type FetchFeed,
 } from '@podcast/catalog';
+import { InMemoryTranscriptStore, type JobQueue, type TranscriptStore, type UserDataStore } from '@podcast/content';
 import { FeedParseError } from '@podcast/feed-parser';
 import { ResolveFeedRequest } from '@podcast/shared';
 import Fastify, { type FastifyServerOptions } from 'fastify';
@@ -21,6 +22,7 @@ import { AuthError, registerAccountRoutes } from './accounts/routes';
 import { InMemoryAccountStore, type AccountStore } from './accounts/store';
 import { DirectoryUnavailableError, type PodcastDirectory } from './podcast-index';
 import { renderShareNotFound, renderSharePage } from './share';
+import { registerTranscriptRoutes } from './transcripts';
 
 export type AppDeps = {
   store?: CatalogStore;
@@ -49,6 +51,8 @@ export type AppDeps = {
   rateLimit?: false | { perMinute: number };
   /** Readiness: throws if a dependency (the database) isn't reachable. */
   ready?: () => Promise<void>;
+  /** The content layer: transcripts, background jobs and derived per-user data. In memory by default. */
+  content?: { transcripts?: TranscriptStore; jobs?: JobQueue; userData?: UserDataStore };
 };
 
 /** Headers for every response: no sniffing, no framing, no referrer beyond the origin. */
@@ -220,13 +224,21 @@ export function buildApp(deps: AppDeps = {}) {
       return renderSharePage({ episode, podcast, shareUrl, episodeUrl });
     });
 
-    registerAccountRoutes(app, {
+    const { requireUser } = registerAccountRoutes(app, {
       accounts: deps.accounts ?? new InMemoryAccountStore(),
       catalog: store,
       email: deps.email ?? new LogEmailSender((message) => app.log.info(message)),
       authSecret: deps.authSecret ?? randomBytes(32).toString('base64url'),
       webUrl,
       now: deps.now,
+      jobs: deps.content?.jobs,
+      userData: deps.content?.userData,
+    });
+
+    registerTranscriptRoutes(app, {
+      catalog: store,
+      transcripts: deps.content?.transcripts ?? new InMemoryTranscriptStore(),
+      requireUser,
     });
 
     const directory = (): PodcastDirectory => {

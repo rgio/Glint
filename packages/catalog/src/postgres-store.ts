@@ -3,7 +3,7 @@ import type { Sql } from 'postgres';
 
 import type { CatalogStore, DueFeed, FeedCacheInfo } from './store';
 
-// Postgres caps a statement at 65,535 parameters; 14 columns per episode keeps a batch well under.
+// Postgres caps a statement at 65,535 parameters; 16 columns per episode keeps a batch well under.
 const EPISODE_BATCH = 1000;
 
 type PodcastRow = {
@@ -33,6 +33,9 @@ type EpisodeRow = {
   artwork_url: string | null;
   season: number | null;
   episode_number: number | null;
+  transcript_url: string | null;
+  transcript_type: string | null;
+  chapters_url: string | null;
 };
 
 const toPodcast = (r: PodcastRow): Podcast => ({
@@ -62,10 +65,13 @@ const toEpisode = (r: EpisodeRow): Episode => ({
   artworkUrl: r.artwork_url,
   season: r.season,
   episodeNumber: r.episode_number,
+  transcriptUrl: r.transcript_url,
+  transcriptType: r.transcript_type,
+  chaptersUrl: r.chapters_url,
 });
 
 const EPISODE_COLUMNS = `id, podcast_id, guid, title, published_at, duration_sec, enclosure_url, enclosure_type,
-  enclosure_bytes, show_notes_html, artwork_url, season, episode_number`;
+  enclosure_bytes, show_notes_html, artwork_url, season, episode_number, transcript_url, transcript_type, chapters_url`;
 
 const PODCAST_COLUMNS = `id, feed_url, title, author, description, artwork_url, language, categories, explicit,
   last_published_at`;
@@ -136,6 +142,9 @@ export class PostgresCatalogStore implements CatalogStore {
         artwork_url: e.artworkUrl,
         season: e.season,
         episode_number: e.episodeNumber,
+        transcript_url: e.transcriptUrl,
+        transcript_type: e.transcriptType,
+        chapters_url: e.chaptersUrl,
       }));
       await this.sql`
         insert into episodes ${this.sql(rows)}
@@ -145,7 +154,8 @@ export class PostgresCatalogStore implements CatalogStore {
           enclosure_url = excluded.enclosure_url, enclosure_type = excluded.enclosure_type,
           enclosure_bytes = excluded.enclosure_bytes, show_notes_html = excluded.show_notes_html,
           artwork_url = excluded.artwork_url, season = excluded.season,
-          episode_number = excluded.episode_number, updated_at = now()`;
+          episode_number = excluded.episode_number, transcript_url = excluded.transcript_url,
+          transcript_type = excluded.transcript_type, chapters_url = excluded.chapters_url, updated_at = now()`;
     }
   }
 

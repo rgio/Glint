@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import type { CatalogStore } from '@podcast/catalog';
+import { onHighlightChanged, type JobQueue, type UserDataStore } from '@podcast/content';
 import {
   EmailSignInStart,
   EmailSignInVerify,
@@ -9,7 +10,10 @@ import {
   type AuthSession,
   type ClientKind,
   type Episode,
+  type HighlightSearchResponse,
   type Podcast,
+  type Recommendation,
+  type RecommendationsResponse,
   type SyncPullResponse,
   type User,
 } from '@podcast/shared';
@@ -48,6 +52,10 @@ export type AccountDeps = {
   authSecret: string;
   webUrl: string;
   now?: () => number;
+  /** Background work for the content worker (transcripts, excerpts, vectors). Optional in tests. */
+  jobs?: JobQueue;
+  /** Cached recommendations and their events. */
+  userData?: UserDataStore;
 };
 
 export class AuthError extends Error {
@@ -60,6 +68,17 @@ export class AuthError extends Error {
   }
 }
 
+const HighlightSearchQuery = z.object({
+  q: z.string().trim().max(200).optional(),
+  cursor: z.coerce.number().int().nonnegative().default(0),
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+});
+
+const RecommendationEvent = z.object({
+  episodeId: z.string().min(1).max(200),
+  event: z.enum(['shown', 'opened', 'played', 'highlighted', 'dismissed']),
+});
+
 const PullQuery = z.object({
   since: z
     .string()
@@ -68,8 +87,10 @@ const PullQuery = z.object({
   limit: z.coerce.number().int().min(1).max(PULL_LIMIT).default(PULL_LIMIT),
 });
 
-/** F-12 accounts and F-13 sync. */
-export function registerAccountRoutes(app: FastifyInstance, deps: AccountDeps) {
+export type RequireUser = (req: FastifyRequest) => Promise<{ user: User; sessionId: string }>;
+
+/** F-12 accounts and F-13 sync. Returns the sign-in check for other routes to use. */
+export function registerAccountRoutes(app: FastifyInstance, deps: AccountDeps): { requireUser: RequireUser } {
   const { accounts, email } = deps;
   const now = deps.now ?? Date.now;
 
@@ -211,7 +232,68 @@ export function registerAccountRoutes(app: FastifyInstance, deps: AccountDeps) {
   app.post('/v1/sync', async (req) => {
     const { user } = await requireUser(req);
     const { changes } = SyncPushRequest.parse(req.body);
-    return { applied: await accounts.applyChanges(user.id, changes) };
+    const applied = await accounts.applyChanges(user.id, changes);
+    // Excerpts, transcripts and vectors follow a highlight change. Enqueueing is idempotent, so a
+    // change that merged to nothing new costs only a no-op insert.
+    if (deps.jobs) {
+      for (const c of changes) {
+        if (c.kind !== 'highlight') continue;
+        try {
+          await onHighlightChanged(deps.jobs, user.id, c.value, now());
+        } catch (err) {
+          req.log.error({ err }, 'could not enqueue highlight jobs');
+        }
+      }
+    }
+    return { applied };
+  });
+
+  /** The shows and episodes these episode ids belong to, for lists that must render offline. */
+  const withCatalog = async (episodeIds: Iterable<string>, extraPodcastIds: Iterable<string> = []) => {
+    const episodes = (await Promise.all([...new Set(episodeIds)].map((id) => deps.catalog.findEpisodeById(id)))).filter(
+      (e): e is Episode => e !== null,
+    );
+    const podcastIds = new Set([...extraPodcastIds, ...episodes.map((e) => e.podcastId)]);
+    const podcasts = (await Promise.all([...podcastIds].map((id) => deps.catalog.findPodcastById(id)))).filter(
+      (p): p is Podcast => p !== null,
+    );
+    return { episodes, podcasts };
+  };
+
+  // Library > Highlights on the web before local data loads, and search across devices.
+  app.get('/v1/me/highlights', async (req): Promise<HighlightSearchResponse> => {
+    const { user } = await requireUser(req);
+    const { q, cursor, limit } = HighlightSearchQuery.parse(req.query);
+    const page = await accounts.searchHighlights(user.id, { q: q || null, offset: cursor, limit });
+    return {
+      highlights: page.highlights,
+      nextCursor: page.hasMore ? String(cursor + limit) : null,
+      ...(await withCatalog(page.highlights.map((h) => h.episodeId))),
+    };
+  });
+
+  // Discovery: episodes like the listener's highlights, rebuilt by the content worker.
+  app.get('/v1/me/recommendations', async (req): Promise<RecommendationsResponse> => {
+    const { user } = await requireUser(req);
+    const cached = await deps.userData?.recommendations(user.id);
+    if (!cached) return { recommendations: [], generatedAt: null };
+    const { episodes, podcasts } = await withCatalog(cached.items.map((r) => r.episodeId));
+    const episodeById = new Map(episodes.map((e) => [e.id, e]));
+    const podcastById = new Map(podcasts.map((p) => [p.id, p]));
+    const recommendations = cached.items.flatMap((r): Recommendation[] => {
+      const episode = episodeById.get(r.episodeId);
+      const podcast = episode && podcastById.get(episode.podcastId);
+      return episode && podcast ? [{ episode, podcast, score: r.score, startSec: r.startSec, because: r.because }] : [];
+    });
+    return { recommendations, generatedAt: cached.generatedAt.toISOString() };
+  });
+
+  // What happened to a recommendation: the measure of whether discovery works.
+  app.post('/v1/me/recommendations/events', async (req, reply) => {
+    const { user } = await requireUser(req);
+    const { episodeId, event } = RecommendationEvent.parse(req.body);
+    await deps.userData?.recordRecEvent(user.id, episodeId, event);
+    return reply.status(204).send();
   });
 
   app.get('/v1/sync', async (req): Promise<SyncPullResponse> => {
@@ -227,13 +309,7 @@ export function registerAccountRoutes(app: FastifyInstance, deps: AccountDeps) {
       if (c.kind === 'subscription') podcastIds.add(c.value.podcastId);
       if (c.kind === 'episodeState' || c.kind === 'queueItem' || c.kind === 'highlight') episodeIds.add(c.value.episodeId);
     }
-    const episodes = (await Promise.all([...episodeIds].map((id) => deps.catalog.findEpisodeById(id)))).filter(
-      (e): e is Episode => e !== null,
-    );
-    for (const e of episodes) podcastIds.add(e.podcastId);
-    const podcasts = (await Promise.all([...podcastIds].map((id) => deps.catalog.findPodcastById(id)))).filter(
-      (p): p is Podcast => p !== null,
-    );
+    const { episodes, podcasts } = await withCatalog(episodeIds, podcastIds);
 
     return {
       changes: page.map(({ version: _version, ...change }) => change),
@@ -243,4 +319,6 @@ export function registerAccountRoutes(app: FastifyInstance, deps: AccountDeps) {
       episodes,
     };
   });
+
+  return { requireUser };
 }
