@@ -24,6 +24,7 @@ export function MiniPlayer({ compact = false }: { compact?: boolean }) {
   const current = usePlayer((s) => s.current);
   const playing = usePlayer((s) => s.playing);
   const fraction = usePlayer((s) => (s.durationSec ? Math.min(1, s.positionSec / s.durationSec) : 0));
+  const skipForwardSec = usePlayer((s) => s.skipForwardSec);
   const { togglePlay, skipForward } = usePlayer.getState();
 
   if (!current) return null;
@@ -50,7 +51,9 @@ export function MiniPlayer({ compact = false }: { compact?: boolean }) {
       {inlineSeek && <InlineSeek />}
       <IconButton name={playing ? 'pause' : 'play'} label={playing ? 'Pause' : 'Play'} onPress={togglePlay} />
       {!compact && <HighlightButton source="miniPlayer" variant="icon" />}
-      {!compact && <IconButton name="skipForward" label="Skip forward" onPress={skipForward} />}
+      {!compact && (
+        <IconButton name={`skipForward${skipForwardSec}`} label={`Skip forward ${skipForwardSec} seconds`} onPress={skipForward} />
+      )}
       {compact ? (
         <View style={[styles.progress, { width: `${fraction * 100}%`, backgroundColor: theme.tint }]} />
       ) : (

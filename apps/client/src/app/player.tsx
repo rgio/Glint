@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Artwork } from '@/components/artwork';
@@ -19,6 +19,8 @@ import { usePlayer } from '@/player/store';
 export default function PlayerScreen() {
   const theme = useTheme();
   const safe = useSafeAreaInsets();
+  // Smaller artwork on short phones (e.g. iPhone mini) so the controls fit without scrolling.
+  const artworkSize = Math.round(Math.min(280, Math.max(160, useWindowDimensions().height - 600)));
   const current = usePlayer((s) => s.current);
   const playing = usePlayer((s) => s.playing);
   const buffering = usePlayer((s) => s.buffering);
@@ -40,7 +42,7 @@ export default function PlayerScreen() {
   return (
     <ThemedView style={styles.fill}>
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: safe.bottom + Spacing.five }]}>
-        <Artwork uri={current.artworkUrl} size={280} />
+        <Artwork uri={current.artworkUrl} size={artworkSize} />
         <View style={styles.titles}>
           <ThemedText type="smallBold" style={styles.title} numberOfLines={3} accessibilityRole="header">
             {current.title}
@@ -55,7 +57,7 @@ export default function PlayerScreen() {
         </View>
 
         <View style={styles.controls}>
-          <IconButton name="skipBack" label={`Skip back ${skipBackSec} seconds`} size={30} onPress={skipBack} />
+          <IconButton name={`skipBack${skipBackSec}`} label={`Skip back ${skipBackSec} seconds`} size={30} onPress={skipBack} />
           <View style={[styles.playButton, { backgroundColor: theme.tint }]}>
             {buffering && !playing ? (
               <ActivityIndicator color={theme.background} accessibilityLabel="Loading" />
@@ -69,7 +71,7 @@ export default function PlayerScreen() {
               />
             )}
           </View>
-          <IconButton name="skipForward" label={`Skip forward ${skipForwardSec} seconds`} size={30} onPress={skipForward} />
+          <IconButton name={`skipForward${skipForwardSec}`} label={`Skip forward ${skipForwardSec} seconds`} size={30} onPress={skipForward} />
         </View>
 
         <View style={styles.secondary}>

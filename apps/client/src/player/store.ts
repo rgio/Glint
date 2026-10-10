@@ -36,8 +36,8 @@ type PlayerState = {
   loaded: boolean;
   error: string | null;
   rate: number;
-  skipBackSec: number;
-  skipForwardSec: number;
+  skipBackSec: SkipInterval;
+  skipForwardSec: SkipInterval;
   /** Up Next, ordered by sortKey. Does not include the current episode. */
   queue: QueueEntry[];
   /** Saved positions and played marks, keyed by episode id. */

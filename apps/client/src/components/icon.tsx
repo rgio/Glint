@@ -7,8 +7,13 @@ import { useTheme } from '@/hooks/use-theme';
 const ICONS = {
   play: { ios: 'play.fill', android: 'play_arrow', web: 'play_arrow' },
   pause: { ios: 'pause.fill', android: 'pause', web: 'pause' },
-  skipBack: { ios: 'gobackward', android: 'fast_rewind', web: 'fast_rewind' },
-  skipForward: { ios: 'goforward', android: 'fast_forward', web: 'fast_forward' },
+  // iOS has a symbol with the number of seconds for each of the skip intervals (SKIP_INTERVALS).
+  skipBack10: { ios: 'gobackward.10', android: 'fast_rewind', web: 'fast_rewind' },
+  skipBack15: { ios: 'gobackward.15', android: 'fast_rewind', web: 'fast_rewind' },
+  skipBack30: { ios: 'gobackward.30', android: 'fast_rewind', web: 'fast_rewind' },
+  skipForward10: { ios: 'goforward.10', android: 'fast_forward', web: 'fast_forward' },
+  skipForward15: { ios: 'goforward.15', android: 'fast_forward', web: 'fast_forward' },
+  skipForward30: { ios: 'goforward.30', android: 'fast_forward', web: 'fast_forward' },
   playNext: { ios: 'text.line.first.and.arrowtriangle.forward', android: 'playlist_play', web: 'playlist_play' },
   playLast: { ios: 'text.line.last.and.arrowtriangle.forward', android: 'playlist_add', web: 'playlist_add' },
   remove: { ios: 'xmark', android: 'close', web: 'close' },
