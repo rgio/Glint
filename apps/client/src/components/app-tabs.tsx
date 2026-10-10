@@ -1,13 +1,13 @@
 import { usePathname } from 'expo-router';
 import { NativeTabs } from 'expo-router/unstable-native-tabs';
-import { Platform, StyleSheet, useColorScheme, View } from 'react-native';
+import { StyleSheet, useColorScheme, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { MiniPlayer } from './mini-player';
 
-import { BottomTabInset, Colors } from '@/constants/theme';
+import { Colors } from '@/constants/theme';
 import { badgeText, useUnplayedNewCount } from '@/library/new-episodes';
-import { FloatingPlayerGap, FloatingPlayerHeight, usesFloatingPlayer, usesTabBarAccessory } from '@/player/placement';
+import { usesTabBarAccessory } from '@/player/placement';
 import { usePlayer } from '@/player/store';
 
 function AccessoryPlayer() {
@@ -22,9 +22,7 @@ export default function AppTabs() {
   // F-11: new, unplayed episodes, shown on the Home tab while another tab is open.
   const homeBadge = badgeText(useUnplayedNewCount());
   const onHome = usePathname() === '/';
-  // The tab bar sits above the home indicator on iPhones; Android's inset already covers it.
-  const { top: safeTop, bottom: safeBottom } = useSafeAreaInsets();
-  const floatingBottom = BottomTabInset + FloatingPlayerGap + (Platform.OS === 'ios' ? safeBottom : 0);
+  const safeTop = useSafeAreaInsets().top;
 
   return (
     <View style={styles.fill}>
@@ -48,12 +46,12 @@ export default function AppTabs() {
           <NativeTabs.Trigger.Label>Library</NativeTabs.Trigger.Label>
           <NativeTabs.Trigger.Icon sf="square.stack.fill" md="library_music" />
         </NativeTabs.Trigger>
-        <NativeTabs.Trigger name="queue">
-          <NativeTabs.Trigger.Label>Up Next</NativeTabs.Trigger.Label>
-          <NativeTabs.Trigger.Icon sf="list.bullet" md="queue_music" />
+        <NativeTabs.Trigger name="highlights">
+          <NativeTabs.Trigger.Label>Highlights</NativeTabs.Trigger.Label>
+          <NativeTabs.Trigger.Icon sf="highlighter" md="ink_highlighter" />
         </NativeTabs.Trigger>
 
-        {/* iOS 26+ shows the mini player as the tab bar's bottom accessory. */}
+        {/* iOS 26+ shows the mini player as the tab bar's bottom accessory; elsewhere see PlayerBar. */}
         {usesTabBarAccessory && hasEpisode && (
           <NativeTabs.BottomAccessory>
             <AccessoryPlayer />
@@ -63,12 +61,6 @@ export default function AppTabs() {
 
       {/* The tab screens have no header, so lists would scroll under the status bar. */}
       <View pointerEvents="none" style={[styles.statusBar, { height: safeTop, backgroundColor: colors.background }]} />
-
-      {usesFloatingPlayer && hasEpisode && (
-        <View style={[styles.floatingPlayer, { bottom: floatingBottom, backgroundColor: colors.backgroundElement }]}>
-          <MiniPlayer />
-        </View>
-      )}
     </View>
   );
 }
@@ -76,12 +68,4 @@ export default function AppTabs() {
 const styles = StyleSheet.create({
   fill: { flex: 1 },
   statusBar: { position: 'absolute', top: 0, left: 0, right: 0 },
-  floatingPlayer: {
-    position: 'absolute',
-    left: 8,
-    right: 8,
-    height: FloatingPlayerHeight,
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
 });

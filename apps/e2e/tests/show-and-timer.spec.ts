@@ -40,7 +40,9 @@ test('the sleep timer fades out and stops', async ({ app, page }) => {
 
   await page.getByLabel('Sleep timer: off. Set').click();
   const options = page.getByRole('radiogroup', { name: 'Sleep timer' }).getByRole('radio');
-  await expect(options).toHaveText(['5 min', '15 min', '30 min', '60 min', 'End of episode', 'Off']);
+  await expect(options).toHaveCount(6);
+  const names = await options.evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')));
+  expect(names).toEqual(['5 min', '15 min', '30 min', '60 min', 'End of episode', 'Off']);
   await page.getByRole('radio', { name: '5 min', exact: true }).click();
   const pill = page.getByLabel(/^Sleep timer: \d+:\d\d\. Change$/);
   await expect(pill).toBeVisible();

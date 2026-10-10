@@ -10,26 +10,39 @@ const playLatest = async (app: App) => {
 
 const rate = (app: App) => app.page.evaluate(() => (window as unknown as { __audios: HTMLAudioElement[] }).__audios.at(-1)!.playbackRate);
 
-test('speed changes in 0.1x steps or by preset, and is remembered', async ({ app, page }) => {
+test('speed is chosen from a menu, and is remembered', async ({ app, page }) => {
   await playLatest(app);
   await page.getByLabel(/^Now playing: /).click();
   await page.getByLabel('Playback speed 1x. Change speed').click();
 
-  await page.getByLabel('Faster by 0.1x').click();
-  await page.getByLabel('Faster by 0.1x').click();
-  await expect(page.getByText('1.2x', { exact: true }).first()).toBeVisible();
-  expect(await rate(app)).toBeCloseTo(1.2);
+  const menu = page.getByRole('radiogroup', { name: 'Playback speed' });
+  await expect(menu.getByRole('radio')).toHaveCount(7);
+  const names = await menu.getByRole('radio').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')));
+  expect(names).toEqual(['0.5x', '0.75x', '1x', '1.25x', '1.5x', '1.75x', '2x']);
+  await expect(menu.getByRole('radio', { name: '1x', exact: true })).toBeChecked();
 
-  await page.getByRole('radio', { name: '0.8x' }).click();
-  expect(await rate(app)).toBeCloseTo(0.8);
-  await page.getByRole('radio', { name: '3x' }).click();
-  await expect(page.getByLabel('Faster by 0.1x')).toBeDisabled();
-  await page.getByLabel('Slower by 0.1x').click();
-  expect(await rate(app)).toBeCloseTo(2.9);
+  await menu.getByRole('radio', { name: '1.25x' }).click();
+  await expect(menu).toBeHidden();
+  expect(await rate(app)).toBeCloseTo(1.25);
+
+  await page.getByLabel('Playback speed 1.25x. Change speed').click();
+  await page.getByRole('radio', { name: '0.75x' }).click();
+  expect(await rate(app)).toBeCloseTo(0.75);
 
   // The speed survives a reload.
   await app.goto('/player');
-  await expect(page.getByLabel('Playback speed 2.9x. Change speed')).toBeVisible();
+  await expect(page.getByLabel('Playback speed 0.75x. Change speed')).toBeVisible();
+});
+
+test('play at the end of an episode starts it over', async ({ app, page }) => {
+  await playLatest(app);
+  await page.evaluate(() => {
+    const a = (window as unknown as { __audios: HTMLAudioElement[] }).__audios.at(-1)!;
+    a.currentTime = a.duration - 1;
+  });
+  await app.waitForAudio('a.paused && a.currentTime > a.duration - 2', 15_000);
+  await page.getByLabel('Play', { exact: true }).first().click();
+  await app.waitForAudio('!a.paused && a.currentTime < 10');
 });
 
 test('skip intervals are chosen in Settings', async ({ app, page }) => {
@@ -47,7 +60,7 @@ test('skip intervals are chosen in Settings', async ({ app, page }) => {
   expect((await app.audio())!.time).toBeLessThan(before + 14);
 });
 
-test('keyboard: space and K play and pause, arrows skip, < and > change speed', async ({ app, page }) => {
+test('keyboard: space and K play and pause, arrows skip, < and > step through the speeds', async ({ app, page }) => {
   await playLatest(app);
   await page.locator('body').click({ position: { x: 5, y: 5 } });
 
@@ -64,9 +77,9 @@ test('keyboard: space and K play and pause, arrows skip, < and > change speed', 
 
   await page.keyboard.press('Shift+Period'); // >
   await page.keyboard.press('Shift+Period');
-  expect(await rate(app)).toBeCloseTo(1.2);
+  expect(await rate(app)).toBeCloseTo(1.5);
   await page.keyboard.press('Shift+Comma'); // <
-  expect(await rate(app)).toBeCloseTo(1.1);
+  expect(await rate(app)).toBeCloseTo(1.25);
 
   // Typing in a field doesn't trigger anything.
   await app.goto('/discover');

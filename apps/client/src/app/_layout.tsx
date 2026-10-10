@@ -7,7 +7,7 @@ import { useColorScheme } from 'react-native';
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import { HighlightOverlay } from '@/components/highlights';
 import { useKeyboardShortcuts } from '@/components/keyboard-shortcuts';
-import { WebPlayerBar } from '@/components/web-player-bar';
+import { PlayerBar } from '@/components/player-bar';
 import { startSync } from '@/sync/engine';
 
 SplashScreen.preventAutoHideAsync();
@@ -33,12 +33,13 @@ export default function RootLayout() {
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="podcast/[id]" options={{ title: '', headerBackTitle: 'Back' }} />
           <Stack.Screen name="episode/[id]" options={{ title: '', headerBackTitle: 'Back' }} />
-          <Stack.Screen name="player" options={{ presentation: 'modal', title: 'Now Playing' }} />
+          <Stack.Screen name="player" options={{ presentation: 'fullScreenModal', headerShown: false }} />
+          <Stack.Screen name="note" options={{ presentation: 'fullScreenModal', title: 'Highlight' }} />
+          <Stack.Screen name="queue" options={{ title: 'Up Next', headerBackTitle: 'Back' }} />
           <Stack.Screen name="settings" options={{ title: 'Settings', headerBackTitle: 'Back' }} />
           <Stack.Screen name="sign-in" options={{ title: 'Signing in', headerBackTitle: 'Back' }} />
-          <Stack.Screen name="highlights" options={{ title: 'Highlights', headerBackTitle: 'Back' }} />
         </Stack>
-        <WebPlayerBar />
+        <PlayerBar />
         <HighlightOverlay />
       </ThemeProvider>
     </QueryClientProvider>

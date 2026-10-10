@@ -62,7 +62,8 @@ describe('sleep timer', () => {
 
 describe('clampRate', () => {
   it('snaps to 0.1 steps within bounds', () => {
-    expect(clampRate(1.26)).toBe(1.3);
+    expect(clampRate(1.26)).toBe(1.25);
+    expect(clampRate(0.74)).toBe(0.75);
     expect(clampRate(0.1)).toBe(0.5);
     expect(clampRate(5)).toBe(3);
     expect(clampRate(2.5, NATIVE_MAX_RATE)).toBe(2);

@@ -18,19 +18,45 @@ type HighlightsState = {
   episodes: Record<string, PlayableEpisode>;
   lastCapture: LastCapture | null;
   toast: HighlightToast | null;
-  /** The highlight whose note editor is open, if any. */
-  editingNoteFor: string | null;
 
   /** Saves the last 30 seconds heard of the playing episode. Null if nothing is loaded. */
   capture(source: HighlightSource): Highlight | null;
+  /** Saves a highlight of the playing episode with a range and note chosen in the editor. */
+  add(source: HighlightSource, range: { startSec: number; endSec: number }, note: string): Highlight | null;
   setNote(id: string, note: string): void;
   setRange(id: string, startSec: number, endSec: number): void;
   remove(id: string): void;
   /** Undo a capture (deletes it) or a deletion (brings back a copy). */
   undo(): void;
-  openNote(id: string | null): void;
   dismissToast(): void;
 };
+
+function newHighlight(
+  episode: PlayableEpisode,
+  durationSec: number | null,
+  source: HighlightSource,
+  range: { startSec: number; endSec: number },
+  note: string | null,
+  now: number,
+): Highlight {
+  return {
+    id: newId(),
+    episodeId: episode.id,
+    podcastId: episode.podcastId,
+    startSec: range.startSec,
+    endSec: range.endSec,
+    note,
+    transcriptExcerpt: null,
+    chapterTitle: null,
+    anchorDurationSec: durationSec ?? episode.durationSec,
+    anchorEnclosureUrl: episode.url,
+    source,
+    createdAt: now,
+    rangeUpdatedAt: now,
+    noteUpdatedAt: now,
+    deleted: false,
+  };
+}
 
 export const useHighlights = create<HighlightsState>()(
   persist(
@@ -45,7 +71,6 @@ export const useHighlights = create<HighlightsState>()(
         episodes: {},
         lastCapture: null,
         toast: null,
-        editingNoteFor: null,
 
         capture(source) {
           const { current, positionSec, rate, durationSec } = usePlayer.getState();
@@ -66,28 +91,26 @@ export const useHighlights = create<HighlightsState>()(
             return get().items[range.id]!;
           }
 
-          const highlight: Highlight = {
-            id: newId(),
-            episodeId: current.id,
-            podcastId: current.podcastId,
-            startSec: range.startSec,
-            endSec: range.endSec,
-            note: null,
-            transcriptExcerpt: null,
-            chapterTitle: null,
-            anchorDurationSec: durationSec ?? current.durationSec,
-            anchorEnclosureUrl: current.url,
-            source,
-            createdAt: now,
-            rangeUpdatedAt: now,
-            noteUpdatedAt: now,
-            deleted: false,
-          };
+          const highlight = newHighlight(current, durationSec, source, range, null, now);
           set({
             items: { ...get().items, [highlight.id]: highlight },
             episodes: { ...get().episodes, [current.id]: current },
             lastCapture: { id: highlight.id, episodeId: current.id, startSec: highlight.startSec, endSec: highlight.endSec, capturedAt: now },
             toast: { kind: 'captured', id: highlight.id, at: now },
+          });
+          return highlight;
+        },
+
+        add(source, range, note) {
+          const { current, durationSec } = usePlayer.getState();
+          if (!current) return null;
+          const trimmed = note.trim().slice(0, HIGHLIGHT_NOTE_MAX) || null;
+          const highlight = newHighlight(current, durationSec, source, range, trimmed, Date.now());
+          set({
+            items: { ...get().items, [highlight.id]: highlight },
+            episodes: { ...get().episodes, [current.id]: current },
+            // A quick capture right after this starts a new highlight rather than extending it.
+            lastCapture: null,
           });
           return highlight;
         },
@@ -113,7 +136,7 @@ export const useHighlights = create<HighlightsState>()(
 
         remove(id) {
           update(id, { deleted: true });
-          set({ toast: { kind: 'deleted', id, at: Date.now() }, editingNoteFor: null });
+          set({ toast: { kind: 'deleted', id, at: Date.now() } });
         },
 
         undo() {
@@ -129,10 +152,6 @@ export const useHighlights = create<HighlightsState>()(
             set({ items: { ...get().items, [copy.id]: copy } });
           }
           set({ toast: null, lastCapture: null });
-        },
-
-        openNote(id) {
-          set({ editingNoteFor: id });
         },
 
         dismissToast() {

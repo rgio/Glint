@@ -1,8 +1,7 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
-import { AccountRow, HighlightsRow } from '@/components/account';
 import { Button } from '@/components/button';
 import { PodcastRow } from '@/components/podcast-row';
 import { EmptyState, SectionTitle, TabScreen } from '@/components/screen';
@@ -12,6 +11,7 @@ import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { exportSubscriptions, importOpml, type OpmlImportOutcome } from '@/library/opml';
 import { useLibrary } from '@/library/store';
+import { usePlayer } from '@/player/store';
 
 type ImportState =
   | { kind: 'idle' }
@@ -49,8 +49,7 @@ export default function LibraryScreen() {
 
   return (
     <TabScreen title="Library">
-      <AccountRow />
-      <HighlightsRow />
+      <UpNextRow />
       <SectionTitle>Subscriptions</SectionTitle>
       <View style={styles.actions}>
         <Button title="Import OPML" variant="secondary" loading={importing} onPress={startImport} style={styles.grow} />
@@ -79,6 +78,25 @@ export default function LibraryScreen() {
         podcasts.map((podcast) => <PodcastRow key={podcast.id} podcast={podcast} />)
       )}
     </TabScreen>
+  );
+}
+
+/** Leads to the queue (Up Next), with how many episodes are in it. */
+function UpNextRow() {
+  const count = usePlayer((s) => s.queue.length);
+  return (
+    <Pressable
+      accessibilityRole="link"
+      accessibilityLabel={`Up Next, ${count}`}
+      onPress={() => router.push('/queue')}
+      style={({ pressed }) => [pressed && styles.pressed]}>
+      <ThemedView type="backgroundElement" style={styles.row}>
+        <ThemedText type="smallBold">Up Next</ThemedText>
+        <ThemedText type="small" themeColor="textSecondary">
+          {count === 0 ? 'Empty' : `${count} ${count === 1 ? 'episode' : 'episodes'}`}
+        </ThemedText>
+      </ThemedView>
+    </Pressable>
   );
 }
 
@@ -141,4 +159,6 @@ const styles = StyleSheet.create({
   actions: { flexDirection: 'row', gap: Spacing.two },
   grow: { flex: 1 },
   card: { padding: Spacing.three, borderRadius: Spacing.three, gap: Spacing.two },
+  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: Spacing.three, borderRadius: Spacing.three },
+  pressed: { opacity: 0.7 },
 });

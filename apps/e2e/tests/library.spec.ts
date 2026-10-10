@@ -75,4 +75,21 @@ test("Home's badge counts new, unplayed episodes and clears after a visit", asyn
   await expect(home).toHaveAccessibleName('Home');
   await page.getByRole('link', { name: 'Discover' }).click();
   await expect(home).toHaveAccessibleName('Home');
+
+  // Home keeps listing the latest unplayed episodes after the visit, newest first.
+  await home.click();
+  await expect(page.getByText('Latest', { exact: true })).toBeVisible();
+  await expect(page.getByLabel(/^Play Daily episode/)).toHaveCount(6);
+  await expect(page.getByLabel(/^Play Weekly episode/).first()).toBeVisible();
+});
+
+test('Settings opens from the gear on Home; Up Next from Library', async ({ app, page }) => {
+  await app.goto('/');
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await expect(page).toHaveURL(/\/settings$/);
+
+  await app.goto('/library');
+  await page.getByRole('link', { name: 'Up Next, 0' }).click();
+  await expect(page).toHaveURL(/\/queue$/);
+  await expect(page.getByText('Your queue is empty')).toBeVisible();
 });

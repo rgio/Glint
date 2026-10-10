@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { Platform, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, StyleSheet, View } from 'react-native';
 
 import { Artwork } from './artwork';
 import { HighlightButton } from './highlights';
@@ -24,8 +24,9 @@ export function MiniPlayer({ compact = false }: { compact?: boolean }) {
   const current = usePlayer((s) => s.current);
   const playing = usePlayer((s) => s.playing);
   const fraction = usePlayer((s) => (s.durationSec ? Math.min(1, s.positionSec / s.durationSec) : 0));
-  const skipForwardSec = usePlayer((s) => s.skipForwardSec);
-  const { togglePlay, skipForward } = usePlayer.getState();
+  const buffering = usePlayer((s) => s.buffering);
+  const skipBackSec = usePlayer((s) => s.skipBackSec);
+  const { togglePlay, skipBack } = usePlayer.getState();
 
   if (!current) return null;
 
@@ -49,13 +50,22 @@ export function MiniPlayer({ compact = false }: { compact?: boolean }) {
         </View>
       </Pressable>
       {inlineSeek && <InlineSeek />}
-      <IconButton name={playing ? 'pause' : 'play'} label={playing ? 'Pause' : 'Play'} onPress={togglePlay} />
+      {/* Skip back, highlight, then play / pause at the right edge, where the thumb rests. */}
+      {!compact && <IconButton name={`skipBack${skipBackSec}`} label={`Skip back ${skipBackSec} seconds`} onPress={skipBack} />}
       {!compact && <HighlightButton source="miniPlayer" variant="icon" />}
-      {!compact && (
-        <IconButton name={`skipForward${skipForwardSec}`} label={`Skip forward ${skipForwardSec} seconds`} onPress={skipForward} />
+      {buffering && !playing ? (
+        <View style={styles.spinner}>
+          <ActivityIndicator accessibilityLabel="Loading" />
+        </View>
+      ) : (
+        <IconButton name={playing ? 'pause' : 'play'} label={playing ? 'Pause' : 'Play'} onPress={togglePlay} />
       )}
-      {compact ? (
-        <View style={[styles.progress, { width: `${fraction * 100}%`, backgroundColor: theme.tint }]} />
+      {/* Phones show a thin progress line along the bottom, inset from the corners; seeking is in
+          the full player. The web bar keeps a seek bar along its top edge. */}
+      {Platform.OS !== 'web' || compact ? (
+        <View style={[styles.progressTrack, { backgroundColor: theme.backgroundSelected }]}>
+          <View style={[styles.progress, { width: `${fraction * 100}%`, backgroundColor: theme.text }]} />
+        </View>
       ) : (
         !inlineSeek && <SeekBar trackHeight={3} hitHeight={16} style={styles.edgeSeek} />
       )}
@@ -89,13 +99,11 @@ const styles = StyleSheet.create({
   },
   body: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   text: { flex: 1 },
-  progress: { position: 'absolute', left: 0, bottom: 0, height: 2 },
-  // On web the bar straddles the top edge, leaving room above it for the thumb and time;
-  // native keeps it inside the bottom of the card, which clips its overflow.
-  edgeSeek: Platform.select({
-    web: { position: 'absolute', left: 0, right: 0, top: -8 },
-    default: { position: 'absolute', left: 0, right: 0, bottom: 0 },
-  }),
+  progressTrack: { position: 'absolute', left: Spacing.two, right: Spacing.two, bottom: 2, height: 2, borderRadius: 1, overflow: 'hidden' },
+  progress: { height: '100%' },
+  spinner: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  // On web the bar straddles the top edge, leaving room above it for the thumb and time.
+  edgeSeek: { position: 'absolute', left: 0, right: 0, top: -8 },
   inlineSeek: { flex: 2, flexDirection: 'row', alignItems: 'center', gap: Spacing.two, marginHorizontal: Spacing.three },
   inlineBar: { flex: 1 },
   time: { minWidth: 44, textAlign: 'center', fontVariant: ['tabular-nums'] },

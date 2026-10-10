@@ -1,13 +1,12 @@
 import type { Highlight } from '@podcast/shared';
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 import { Button } from '@/components/button';
 import { HighlightCard } from '@/components/highlights';
-import { EmptyState, useContentInsets } from '@/components/screen';
+import { EmptyState, TabScreen } from '@/components/screen';
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { MaxContentWidth, Spacing } from '@/constants/theme';
+import { Spacing } from '@/constants/theme';
 import { LOOKBACK_SEC } from '@/highlights/capture';
 import { useHighlights } from '@/highlights/store';
 import { highlightsMarkdown } from '@/highlights/text';
@@ -17,7 +16,6 @@ import { saveTextFile } from '@/lib/save-file';
 /** Every highlight across shows, newest first, searchable, with Markdown export. */
 export default function HighlightsScreen() {
   const theme = useTheme();
-  const insets = useContentInsets();
   const items = useHighlights((s) => s.items);
   const episodes = useHighlights((s) => s.episodes);
   const [query, setQuery] = useState('');
@@ -42,13 +40,11 @@ export default function HighlightsScreen() {
     });
 
   return (
-    <ThemedView style={styles.fill}>
-      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.paddingBottom }]}>
-        <View style={styles.column}>
+    <TabScreen title="Highlights">
           {live.length === 0 ? (
             <EmptyState
               title="No highlights yet"
-              body={`While listening, tap Highlight in the player (or press H on the web) to save the last ${LOOKBACK_SEC} seconds. Add a note any time.`}
+              body={`While listening, tap the highlighter in the player to save a moment with a note (or press H on the web to save the last ${LOOKBACK_SEC} seconds).`}
             />
           ) : (
             <>
@@ -82,16 +78,11 @@ export default function HighlightsScreen() {
               )}
             </>
           )}
-        </View>
-      </ScrollView>
-    </ThemedView>
+    </TabScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  fill: { flex: 1 },
-  content: { paddingHorizontal: Spacing.three, paddingTop: Spacing.three, alignItems: 'center' },
-  column: { width: '100%', maxWidth: MaxContentWidth, gap: Spacing.two },
   input: { minHeight: 44, borderWidth: 1, borderRadius: Spacing.three, paddingHorizontal: Spacing.three, fontSize: 16 },
   row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   grow: { flex: 1 },

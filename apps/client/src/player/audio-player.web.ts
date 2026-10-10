@@ -7,7 +7,7 @@ class WebAudioPlayer implements AudioPlayer {
   private audio: HTMLAudioElement | null = null;
   private listeners = new Set<(event: PlayerEvent) => void>();
   private rate = 1;
-  private skipBackSec = 15;
+  private skipBackSec = 30;
   private skipForwardSec = 30;
 
   private emit(event: PlayerEvent) {

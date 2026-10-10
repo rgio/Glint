@@ -23,32 +23,54 @@ async function playAt(app: App, page: Page, seconds: number) {
 const highlights = async (app: App) =>
   Object.values((await app.stored<{ items: Record<string, Highlight> }>('highlights'))?.items ?? {}).filter((h) => !h.deleted);
 
-test('captures the last 30 seconds from the player, adds a note, and shows it on the episode', async ({ app, page }) => {
+test('the highlight button opens the editor on the last 30 seconds; the range and note are saved', async ({ app, page }) => {
   const episode = await playAt(app, page, 90);
   await page.getByLabel(/^Now playing: /).click();
-  await page.getByLabel('Highlight the last 30 seconds').click();
-  await expect(page.getByRole('status')).toContainText(/^Highlighted \d+:\d\d–\d+:\d\d/);
+  await page.getByLabel('New highlight or note').click();
+  await expect(page).toHaveURL(/\/note\?source=player$/);
 
-  // A second press within 10 seconds extends the same highlight.
-  await page.getByLabel('Highlight the last 30 seconds').click();
-  await expect.poll(async () => (await highlights(app)).length).toBe(1);
+  // It starts on the last 30 seconds heard.
+  const start = page.getByRole('slider', { name: 'Start of highlight' });
+  const end = page.getByRole('slider', { name: 'End of highlight' });
+  await expect(page.getByText(/^\d+:\d\d–\d+:\d\d · 30 s$/)).toBeVisible();
 
-  await page.getByRole('status').getByText('Add note').click();
-  const editor = page.getByRole('dialog', { name: 'Highlight note' });
-  await editor.getByLabel('Note', { exact: true }).fill('Try this on the onboarding flow');
-  await editor.getByRole('button', { name: 'Save' }).click();
-  await expect(editor).toBeHidden();
+  // Drag the end handle later, then nudge the start earlier.
+  const box = (await end.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2 + 40, box.y + box.height / 2, { steps: 5 });
+  await page.mouse.up();
+  await page.getByLabel('Move start 5 seconds earlier').click();
+  const label = await page.getByText(/^\d+:\d\d–\d+:\d\d · \d+ s$/).innerText();
+  const length = Number(/· (\d+) s$/.exec(label)![1]);
+  expect(length).toBeGreaterThan(35);
+  await expect(start).toBeVisible();
+
+  await page.getByLabel('Note', { exact: true }).fill('Try this on the onboarding flow');
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(page).toHaveURL(/\/player$/);
   await app.waitForAudio('!a.paused'); // writing a note never pauses playback
+
+  const [h] = await highlights(app);
+  expect(Math.round(h!.endSec - h!.startSec)).toBe(length);
+  expect(h!.source).toBe('player');
+  expect(h!.note).toBe('Try this on the onboarding flow');
 
   await app.goto(`/episode/${episode.id}`);
   await expect(page.getByText('Highlights', { exact: true })).toBeVisible();
   await expect(page.getByText('Try this on the onboarding flow')).toBeVisible();
-  const [h] = await highlights(app);
-  expect(h!.endSec - h!.startSec).toBeGreaterThanOrEqual(29);
-  expect(h!.source).toBe('player');
 });
 
-test('H highlights on the web, Shift+H opens the note, and typing doesn\'t trigger it', async ({ app, page }) => {
+test('cancelling the editor saves nothing', async ({ app, page }) => {
+  await playAt(app, page, 60);
+  await page.getByLabel('New highlight or note').click();
+  await page.getByLabel('Note', { exact: true }).fill('Never mind');
+  await page.getByRole('button', { name: 'Cancel' }).click();
+  await expect(page).not.toHaveURL(/\/note/);
+  expect(await highlights(app)).toEqual([]);
+});
+
+test('H highlights on the web, Shift+H opens it in the editor, and typing doesn\'t trigger it', async ({ app, page }) => {
   await playAt(app, page, 60);
   await page.locator('body').click({ position: { x: 5, y: 5 } });
   await page.keyboard.press('h');
@@ -59,11 +81,11 @@ test('H highlights on the web, Shift+H opens the note, and typing doesn\'t trigg
   await expect.poll(async () => (await highlights(app)).length).toBe(0);
 
   await page.keyboard.press('Shift+H');
-  await expect(page.getByRole('dialog', { name: 'Highlight note' })).toBeVisible();
+  await expect(page).toHaveURL(/\/note\?id=/);
   // Typing an "h" in the note doesn't capture another highlight.
   await page.getByLabel('Note', { exact: true }).fill('h is for highlight');
   await page.keyboard.press('h');
-  await page.getByRole('button', { name: 'Save' }).click();
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
   await expect.poll(async () => (await highlights(app)).map((h) => h.note)).toEqual(['h is for highlighth']);
 });
 
@@ -83,8 +105,10 @@ test('plays just the highlighted range, adjusts it, shares a quote, and deletes 
   expect((await app.audio())!.time).toBeGreaterThanOrEqual(end - 0.5);
   expect((await app.audio())!.time).toBeLessThan(end + 1.5);
 
-  await card.getByRole('button', { name: 'Adjust range' }).click();
-  await card.getByLabel('Move end 5 seconds later').click();
+  await card.getByRole('button', { name: /^Edit highlight/ }).click();
+  await page.getByLabel('Move end 5 seconds later').click();
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(page).toHaveURL(new RegExp(`/episode/${episode.id}$`));
   await expect.poll(async () => (await highlights(app))[0]!.endSec).toBeCloseTo(end + 5, 0);
 
   await page.evaluate(() => {
@@ -111,15 +135,17 @@ test('the Highlights page searches, filters and exports Markdown', async ({ app,
   await playAt(app, page, 60);
   await page.keyboard.press('Shift+H');
   await page.getByLabel('Note', { exact: true }).fill('Pricing idea');
-  await page.getByRole('button', { name: 'Save' }).click();
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
   const box = (await page.getByLabel('Playback position').first().boundingBox())!;
   await page.mouse.click(box.x + box.width * 0.6, box.y + box.height - 2);
   await app.waitForAudio('a.currentTime > 175');
   await page.keyboard.press('h');
   await expect.poll(async () => (await highlights(app)).length).toBe(2);
 
-  await app.goto('/library');
-  await page.getByRole('link', { name: 'Highlights, 2' }).click();
+  // Highlights is a tab.
+  await app.goto('/');
+  await page.getByText('Highlights', { exact: true }).click();
+  await expect(page).toHaveURL(/\/highlights$/);
   await expect(page.getByLabel(/^Highlight \d/)).toHaveCount(2);
 
   await page.getByRole('checkbox', { name: 'Has a note' }).click();
@@ -154,7 +180,7 @@ test('highlights and their notes sync between devices', async ({ browser }) => {
   const episode = await playAt(a, a.page, 60);
   await a.page.keyboard.press('Shift+H');
   await a.page.getByLabel('Note', { exact: true }).fill('From device A');
-  await a.page.getByRole('button', { name: 'Save' }).click();
+  await a.page.getByRole('button', { name: 'Save', exact: true }).click();
   await a.page.getByLabel('Pause', { exact: true }).click(); // pausing syncs
 
   await expect.poll(async () => (await b.syncNow(), (await highlights(b)).map((h) => h.note)), { timeout: 30_000 }).toEqual(['From device A']);
@@ -164,6 +190,6 @@ test('highlights and their notes sync between devices', async ({ browser }) => {
   // B edits the note; A sees the edit.
   await b.page.getByLabel(/^Edit note: From device A$/).click();
   await b.page.getByLabel('Note', { exact: true }).fill('Edited on B');
-  await b.page.getByRole('button', { name: 'Save' }).click();
+  await b.page.getByRole('button', { name: 'Save', exact: true }).click();
   await expect.poll(async () => (await a.syncNow(), (await highlights(a)).map((h) => h.note)), { timeout: 30_000 }).toEqual(['Edited on B']);
 });

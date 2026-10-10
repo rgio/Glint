@@ -5,6 +5,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { Artwork } from '@/components/artwork';
 import { Button } from '@/components/button';
 import { EpisodeRow } from '@/components/episode-row';
+import { IconButton } from '@/components/icon';
 import { EmptyState, SectionTitle, TabScreen } from '@/components/screen';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -18,25 +19,27 @@ export default function HomeScreen() {
   // Remember when the listener left Home, so next time "New" only shows what arrived since.
   useFocusEffect(useCallback(() => () => useLibrary.getState().markHomeVisited(), []));
 
-  // F-11: "New" replaces push notifications in v1.
-  const { listed: fresh, loading, subscribed } = useNewEpisodes();
+  // F-11: the latest episodes stand in for push notifications in v1.
+  const { latest, loading, subscribed } = useNewEpisodes();
 
   return (
-    <TabScreen title="Home">
+    <TabScreen
+      title="Home"
+      headerRight={<IconButton name="settings" label="Settings" size={24} onPress={() => router.push('/settings')} />}>
       <ContinueListening />
 
-      <SectionTitle>New</SectionTitle>
+      <SectionTitle>Latest</SectionTitle>
       {!subscribed ? (
         <EmptyState title="Nothing here yet" body="Subscribe to shows and their new episodes will show up here.">
           <Button title="Find a show" variant="secondary" onPress={() => router.navigate('/discover')} />
         </EmptyState>
-      ) : fresh.length === 0 ? (
+      ) : latest.length === 0 ? (
         <EmptyState
           title={loading ? 'Checking for new episodes…' : "You're all caught up"}
-          body={loading ? '' : 'No new episodes since your last visit.'}
+          body={loading ? '' : "You've played the latest episodes of every show you follow."}
         />
       ) : (
-        fresh.map(({ episode, podcast }) => (
+        latest.map(({ episode, podcast }) => (
           <EpisodeRow key={episode.id} episode={episode} podcast={podcast} showPodcast />
         ))
       )}

@@ -25,6 +25,10 @@ const ICONS = {
   share: { ios: 'square.and.arrow.up', android: 'share', web: 'ios_share' },
   highlight: { ios: 'highlighter', android: 'ink_highlighter', web: 'ink_highlighter' },
   trash: { ios: 'trash', android: 'delete', web: 'delete' },
+  checkmark: { ios: 'checkmark', android: 'check', web: 'check' },
+  collapse: { ios: 'chevron.down', android: 'keyboard_arrow_down', web: 'keyboard_arrow_down' },
+  settings: { ios: 'gearshape', android: 'settings', web: 'settings' },
+  queue: { ios: 'list.bullet', android: 'queue_music', web: 'queue_music' },
 } as const;
 
 export type IconName = keyof typeof ICONS;

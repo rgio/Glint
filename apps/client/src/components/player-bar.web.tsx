@@ -12,12 +12,12 @@ import { usePlayer } from '@/player/store';
  * layout rather than the tab layout so it stays visible on pushed screens
  * like a show page.
  */
-export function WebPlayerBar() {
+export function PlayerBar() {
   const hasEpisode = usePlayer((s) => s.current !== null);
   const pathname = usePathname();
 
-  // The full player already has every control.
-  if (!hasEpisode || pathname === '/player') return null;
+  // The full player and the note editor already have the controls.
+  if (!hasEpisode || pathname === '/player' || pathname === '/note') return null;
 
   return (
     <ThemedView type="backgroundElement" style={styles.player}>

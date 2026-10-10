@@ -93,7 +93,7 @@ export const Settings = z.object({
 export type Settings = z.infer<typeof Settings>;
 
 export const DEFAULT_SETTINGS: Settings = {
-  skipBackSec: 15,
+  skipBackSec: 30,
   skipForwardSec: 30,
   playbackRate: 1,
   wifiOnlyDownloads: true,

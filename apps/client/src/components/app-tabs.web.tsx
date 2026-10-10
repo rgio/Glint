@@ -39,8 +39,8 @@ export default function AppTabs() {
           <TabTrigger name="library" href="/library" asChild>
             <TabButton>Library</TabButton>
           </TabTrigger>
-          <TabTrigger name="queue" href="/queue" asChild>
-            <TabButton>Up Next</TabButton>
+          <TabTrigger name="highlights" href="/highlights" asChild>
+            <TabButton>Highlights</TabButton>
           </TabTrigger>
         </CustomTabList>
       </TabList>

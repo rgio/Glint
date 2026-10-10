@@ -1,13 +1,11 @@
-import { router } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { StyleSheet, TextInput, View } from 'react-native';
 
 import { Button } from './button';
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
 
 import { deleteAccount, signOut, startEmailSignIn, useAuth, verifySignIn } from '@/auth/session';
-import { useHighlights } from '@/highlights/store';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { syncNow, useSync } from '@/sync/engine';
@@ -19,51 +17,6 @@ export function useSyncStatusText(): string {
   if (status === 'error') return `Couldn't sync: ${error}`;
   if (!lastSyncedAt) return 'Not synced yet';
   return `Synced at ${new Date(lastSyncedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
-}
-
-/** A row on Library that leads to the account settings and shows whether sync is on. */
-export function AccountRow() {
-  const user = useAuth((s) => s.user);
-  const syncText = useSyncStatusText();
-  return (
-    <Pressable
-      accessibilityRole="link"
-      onPress={() => router.push('/settings')}
-      style={({ pressed }) => [pressed && styles.pressed]}>
-      <ThemedView type="backgroundElement" style={styles.row}>
-        <View style={styles.rowText}>
-          <ThemedText type="smallBold">{user ? user.email : 'Sign in to sync across devices'}</ThemedText>
-          <ThemedText type="small" themeColor="textSecondary">
-            {user ? syncText : 'Your subscriptions, queue and progress, on every device'}
-          </ThemedText>
-        </View>
-        <ThemedText type="small" themeColor="textSecondary">
-          Settings
-        </ThemedText>
-      </ThemedView>
-    </Pressable>
-  );
-}
-
-/** A row on Library leading to every highlight. */
-export function HighlightsRow() {
-  const count = useHighlights((s) => Object.values(s.items).filter((h) => !h.deleted).length);
-  return (
-    <Pressable
-      accessibilityRole="link"
-      accessibilityLabel={`Highlights, ${count}`}
-      onPress={() => router.push('/highlights')}
-      style={({ pressed }) => [pressed && styles.pressed]}>
-      <ThemedView type="backgroundElement" style={styles.row}>
-        <View style={styles.rowText}>
-          <ThemedText type="smallBold">Highlights</ThemedText>
-          <ThemedText type="small" themeColor="textSecondary">
-            {count === 0 ? 'Moments you save while listening' : `${count} saved`}
-          </ThemedText>
-        </View>
-      </ThemedView>
-    </Pressable>
-  );
 }
 
 /** F-12: email sign-in. The email carries a code to type here and, for the web, a link. */

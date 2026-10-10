@@ -1,14 +1,17 @@
 /** Speeds the UI offers. Native players cap lower; see `clampRate`. */
 export const MIN_RATE = 0.5;
 export const MAX_RATE = 3;
-export const RATE_STEP = 0.1;
+/** Speeds land on multiples of this, so 0.75x and 1.25x are possible. */
+export const RATE_STEP = 0.05;
+/** The speeds the player offers. */
+export const RATE_PRESETS = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2] as const;
 
 /** expo-audio supports at most 2.0x on iOS and Android. */
 export const NATIVE_MAX_RATE = 2;
 
 export function clampRate(rate: number, max = MAX_RATE): number {
   const stepped = Math.round(rate / RATE_STEP) * RATE_STEP;
-  return Math.min(max, Math.max(MIN_RATE, Number(stepped.toFixed(1))));
+  return Math.min(max, Math.max(MIN_RATE, Number(stepped.toFixed(2))));
 }
 
 /** F-09: an episode counts as played at 95%, or with under 30 s left. */

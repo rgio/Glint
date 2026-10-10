@@ -1,6 +1,6 @@
 import {
   clampRate,
-  RATE_STEP,
+  RATE_PRESETS,
   POSITION_SAVE_INTERVAL_MS,
   shouldMarkPlayed,
   sleepFadeVolume,
@@ -22,9 +22,6 @@ import type { PlayableEpisode } from './types';
 
 export type QueueEntry = PlayableEpisode & { sortKey: string };
 export type SavedState = { positionSec: number; played: boolean; updatedAt: number };
-
-/** Speeds offered as one-tap choices in the speed options. */
-export const RATE_PRESETS = [0.8, 1, 1.2, 1.5, 1.8, 2, 2.5, 3];
 
 type PlayerState = {
   current: PlayableEpisode | null;
@@ -61,7 +58,7 @@ type PlayerState = {
   skipForward(): void;
   /** Sets the speed, clamped to what this device's player supports. */
   setRate(rate: number): void;
-  /** Speeds up (1) or slows down (-1) by 0.1x. */
+  /** Moves to the next faster (1) or slower (-1) of the preset speeds. */
   stepRate(direction: -1 | 1): void;
   setSkipIntervals(intervals: { back?: SkipInterval; forward?: SkipInterval }): void;
   playNext(episode: PlayableEpisode): void;
@@ -197,7 +194,7 @@ export const usePlayer = create<PlayerState>()(
         loaded: false,
         error: null,
         rate: 1,
-        skipBackSec: 15,
+        skipBackSec: 30,
         skipForwardSec: 30,
         queue: [],
         saved: {},
@@ -251,7 +248,7 @@ export const usePlayer = create<PlayerState>()(
         },
 
         togglePlay() {
-          const { current, loaded } = get();
+          const { current, loaded, positionSec, durationSec } = get();
           if (!current) return;
           if (!loaded) {
             void get().playEpisode(current);
@@ -260,6 +257,8 @@ export const usePlayer = create<PlayerState>()(
             set({ playing: false });
             saveCurrentPosition();
           } else {
+            // At the end of an episode (nothing queued after it), play starts it over.
+            if (durationSec && positionSec >= durationSec - 1) get().seekTo(0);
             audioPlayer.play();
           }
         },
@@ -288,7 +287,10 @@ export const usePlayer = create<PlayerState>()(
         },
 
         stepRate(direction) {
-          get().setRate(get().rate + direction * RATE_STEP);
+          const { rate } = get();
+          const presets = RATE_PRESETS.filter((r) => r <= audioPlayer.maxRate);
+          const next = direction > 0 ? presets.find((r) => r > rate + 0.01) : presets.findLast((r) => r < rate - 0.01);
+          if (next !== undefined) get().setRate(next);
         },
 
         setSkipIntervals({ back, forward }) {
@@ -349,7 +351,13 @@ export const usePlayer = create<PlayerState>()(
     },
     {
       name: 'player',
-      version: 1,
+      version: 2,
+      // Version 2 made 30 s the default skip back; listeners still on the old default of 15 s move to it.
+      migrate: (persisted, version): PersistedPlayerState => {
+        const state = persisted as PersistedPlayerState;
+        if (version < 2 && state.skipBackSec === 15) return { ...state, skipBackSec: 30 as const };
+        return state;
+      },
       storage: persistStorage<PersistedPlayerState>(),
       // The live position changes several times a second; it's restored from `saved` instead.
       partialize: ({ current, rate, skipBackSec, skipForwardSec, queue, saved }): PersistedPlayerState => ({

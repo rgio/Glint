@@ -1,20 +1,25 @@
-import { StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 
 import { Artwork } from '@/components/artwork';
 import { IconButton } from '@/components/icon';
-import { EmptyState, TabScreen } from '@/components/screen';
+import { EmptyState, useContentInsets } from '@/components/screen';
 import { ThemedText } from '@/components/themed-text';
-import { Spacing } from '@/constants/theme';
+import { ThemedView } from '@/components/themed-view';
+import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { usePlayer } from '@/player/store';
 
+/** Up Next: the episodes lined up after the current one. Opened from Library and the player. */
 export default function QueueScreen() {
   const theme = useTheme();
   const queue = usePlayer((s) => s.queue);
+  const insets = useContentInsets();
   const { playEpisode, moveInQueue, removeFromQueue } = usePlayer.getState();
 
   return (
-    <TabScreen title="Up Next">
+    <ThemedView style={styles.fill}>
+      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.paddingBottom }]}>
+        <View style={styles.column}>
       {queue.length === 0 ? (
         <EmptyState
           title="Your queue is empty"
@@ -49,11 +54,16 @@ export default function QueueScreen() {
           </View>
         ))
       )}
-    </TabScreen>
+        </View>
+      </ScrollView>
+    </ThemedView>
   );
 }
 
 const styles = StyleSheet.create({
+  fill: { flex: 1 },
+  content: { paddingHorizontal: Spacing.three, paddingTop: Spacing.three, alignItems: 'center' },
+  column: { width: '100%', maxWidth: MaxContentWidth, gap: Spacing.two },
   row: {
     flexDirection: 'row',
     alignItems: 'center',

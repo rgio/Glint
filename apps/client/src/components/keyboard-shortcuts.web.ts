@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 
+import { openHighlightEditor } from '@/highlights/editor';
 import { useHighlights } from '@/highlights/store';
 import { usePlayer } from '@/player/store';
 
@@ -7,8 +8,8 @@ import { usePlayer } from '@/player/store';
  * Web shortcuts, ignored while typing:
  * - Space or K: play / pause (Space is left to a focused button or link, which it presses)
  * - ← or J / → or L: skip back / forward
- * - < / >: 0.1x slower / faster
- * - H: highlight the last 30 seconds; Shift+H also opens the note
+ * - < / >: the next slower / faster speed
+ * - H: highlight the last 30 seconds; Shift+H also opens it in the editor
  */
 export function useKeyboardShortcuts() {
   useEffect(() => {
@@ -46,7 +47,7 @@ export function useKeyboardShortcuts() {
         case 'h': {
           if (e.repeat) return;
           const highlight = useHighlights.getState().capture('keyboard');
-          if (highlight && e.shiftKey) useHighlights.getState().openNote(highlight.id);
+          if (highlight && e.shiftKey) openHighlightEditor({ id: highlight.id });
           return run(() => {});
         }
       }
