@@ -12,7 +12,9 @@ export type ParsedEpisode = {
   artworkUrl: string | null;
   season: number | null;
   episodeNumber: number | null;
+  /** The best timed transcript the feed offers (see `pickTranscript`), if any. */
   transcriptUrl: string | null;
+  transcriptType: string | null;
   chaptersUrl: string | null;
 };
 
@@ -101,11 +103,29 @@ function categories(channel: Node): string[] {
   return [...names];
 }
 
+/**
+ * Timed formats first, since only those can be matched to a highlight's range. Plain text and HTML
+ * transcripts are kept as a last resort so the episode page can still link to them.
+ */
+const TRANSCRIPT_TYPES = ['application/json', 'text/vtt', 'application/x-subrip', 'application/srt', 'text/srt'];
+
+/** The best `podcast:transcript` by type: JSON, then WebVTT, then SRT, then anything else. */
+export function pickTranscript(tags: unknown[]): { url: string; type: string | null } | null {
+  const rank = (type: string | null) => {
+    const i = TRANSCRIPT_TYPES.indexOf((type ?? '').toLowerCase().split(';')[0]!.trim());
+    return i === -1 ? TRANSCRIPT_TYPES.length : i;
+  };
+  const candidates = tags
+    .map((t) => ({ url: httpUrl(attr(t, 'url')), type: attr(t, 'type') }))
+    .filter((t): t is { url: string; type: string | null } => t.url !== null);
+  return candidates.sort((a, b) => rank(a.type) - rank(b.type))[0] ?? null;
+}
+
 function parseItem(item: Node, channelArtwork: string | null): ParsedEpisode | null {
   const enclosureUrl = httpUrl(attr(item.enclosure, 'url'));
   if (!enclosureUrl) return null;
 
-  const transcripts = Array.isArray(item['podcast:transcript']) ? item['podcast:transcript'] : [];
+  const transcript = pickTranscript(Array.isArray(item['podcast:transcript']) ? item['podcast:transcript'] : []);
   return {
     guid: text(item.guid) ?? enclosureUrl,
     title: text(item.title) ?? 'Untitled episode',
@@ -118,7 +138,8 @@ function parseItem(item: Node, channelArtwork: string | null): ParsedEpisode | n
     artworkUrl: httpUrl(attr(item['itunes:image'], 'href')) ?? channelArtwork,
     season: int(text(item['itunes:season'])),
     episodeNumber: int(text(item['itunes:episode'])),
-    transcriptUrl: httpUrl(transcripts.map((t) => attr(t, 'url')).find(Boolean) ?? null),
+    transcriptUrl: transcript?.url ?? null,
+    transcriptType: transcript?.type ?? null,
     chaptersUrl: httpUrl(attr(item['podcast:chapters'], 'url')),
   };
 }

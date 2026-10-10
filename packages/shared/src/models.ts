@@ -30,6 +30,11 @@ export const Episode = z.object({
   artworkUrl: z.url().nullable(),
   season: z.number().int().nullable(),
   episodeNumber: z.number().int().nullable(),
+  /** The feed's best timed `podcast:transcript`, if any (Podcasting 2.0). */
+  transcriptUrl: z.string().nullable(),
+  /** Its MIME type, e.g. `application/json` or `text/vtt`. */
+  transcriptType: z.string().nullable(),
+  chaptersUrl: z.string().nullable(),
 });
 export type Episode = z.infer<typeof Episode>;
 
@@ -113,6 +118,9 @@ export const HIGHLIGHT_MAX_SEC = 300;
 export const HIGHLIGHT_MIN_SEC = 3;
 export const HIGHLIGHT_NOTE_MAX = 5000;
 
+export const TranscriptConfidence = z.enum(['exact', 'aligned', 'approximate']);
+export type TranscriptConfidence = z.infer<typeof TranscriptConfidence>;
+
 export const Highlight = z.object({
   /** Made on the device, so offline captures never collide. */
   id: z.uuid(),
@@ -121,9 +129,18 @@ export const Highlight = z.object({
   startSec: z.number().nonnegative(),
   endSec: z.number().nonnegative(),
   note: z.string().max(HIGHLIGHT_NOTE_MAX).nullable(),
-  /** The transcript words in the range, once a transcript is available (later phase). */
+  /**
+   * The transcript words in the range. Server-owned: computed from the range and the episode's
+   * transcript, and filled in on pull. Clients never set it; the server ignores what they send.
+   */
   transcriptExcerpt: z.string().nullable(),
+  /** The chapter at the start of the range. Server-owned, like the excerpt. */
   chapterTitle: z.string().nullable(),
+  /**
+   * How well the range lines up with the transcript's timings (server-owned). `aligned` and
+   * `approximate` mean the audio differed from what was transcribed, e.g. other inserted ads.
+   */
+  transcriptConfidence: TranscriptConfidence.nullable().optional(),
   /** The episode as it was when captured, for relocating the range if the audio changes. */
   anchorDurationSec: z.number().nonnegative().nullable(),
   anchorEnclosureUrl: z.string().nullable(),

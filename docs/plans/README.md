@@ -9,6 +9,7 @@ Everything planned and decided in the 2026-10-01 Claude Code session that specce
 | [03-implementation-plan.md](03-implementation-plan.md) | How the code is laid out, where it differs from the spec (notably `expo-audio` instead of track-player, and no local DB yet), and what was verified |
 | [04-status-and-todos.md](04-status-and-todos.md) | Every P0 feature and infra item marked done / partial / not started, the suggested next steps, and open questions |
 | [05-highlights-spec.md](05-highlights-spec.md) | The highlights and notes feature: capture, review, transcripts (dLogos), sync, the audio-stack constraint, phasing and open questions |
+| [06-data-layer-plan.md](06-data-layer-plan.md) | Draft: transcripts (dLogos first), highlights as queryable data, pgvector embeddings, discovery from highlights and notes, phasing and open questions |
 
 ## Where things stand
 

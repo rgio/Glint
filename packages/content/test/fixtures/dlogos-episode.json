@@ -1,0 +1,174 @@
+{
+  "ready": {
+    "episode_id": "11111111-2222-4333-8444-555555555555",
+    "status": "ready",
+    "detail": {
+      "transcript_status": "ready",
+      "has_breakdown": true,
+      "has_claims": false,
+      "jobs": [
+        {
+          "job_type": "factcheck",
+          "status": "running"
+        },
+        {
+          "job_type": "breakdown",
+          "status": "done"
+        },
+        {
+          "job_type": "transcript",
+          "status": "done"
+        }
+      ]
+    },
+    "episode": {
+      "id": "11111111-2222-4333-8444-555555555555",
+      "guid": "guid-main-street",
+      "slug": "rebuilding-main-street",
+      "title": "Rebuilding Main Street",
+      "date_published": "2026-08-25T09:45:00+00:00",
+      "duration_seconds": 600,
+      "audio_url": "https://cdn.example.com/main-street.mp3",
+      "podcast": {
+        "id": "99999999-8888-4777-8666-555555555555",
+        "name": "Town Talk",
+        "slug": "town-talk-a1b2c3d4"
+      }
+    },
+    "transcript": {
+      "segments": [
+        {
+          "idx": 0,
+          "start_ms": 500,
+          "end_ms": 55000,
+          "speaker": "Host A",
+          "text": "Welcome back to the show. Today we're talking about how small towns rebuild their main streets."
+        },
+        {
+          "idx": 1,
+          "start_ms": 55500,
+          "end_ms": 110000,
+          "speaker": "Host A",
+          "text": "Our guest has spent ten years studying it. Thanks for coming on."
+        },
+        {
+          "idx": 2,
+          "start_ms": 110500,
+          "end_ms": 165000,
+          "speaker": "Guest B",
+          "text": "Thanks for having me. It's a topic I care about a lot."
+        },
+        {
+          "idx": 3,
+          "start_ms": 165500,
+          "end_ms": 195000,
+          "speaker": "Host A",
+          "text": "Before we start, this episode is brought to you by Acme Mattresses. Use code SLEEP for ten percent off."
+        },
+        {
+          "idx": 4,
+          "start_ms": 195500,
+          "end_ms": 250000,
+          "speaker": "Guest B",
+          "text": "So the first thing people get wrong is thinking it starts with money. It starts with foot traffic."
+        },
+        {
+          "idx": 5,
+          "start_ms": 250500,
+          "end_ms": 305000,
+          "speaker": "Guest B",
+          "text": "If nobody walks past a shop, no grant will save it. Towns that widened sidewalks saw rents recover first."
+        },
+        {
+          "idx": 6,
+          "start_ms": 305500,
+          "end_ms": 360000,
+          "speaker": "Host A",
+          "text": "That's surprising. Why sidewalks and not parking?"
+        },
+        {
+          "idx": 7,
+          "start_ms": 360500,
+          "end_ms": 415000,
+          "speaker": "Guest B",
+          "text": "Parking brings cars, not people who linger. Lingering is what fills cafes and bookshops."
+        }
+      ],
+      "total": 12,
+      "page": 0,
+      "page_size": 8,
+      "has_more": true
+    },
+    "speaker_map": {
+      "Speaker 0": "Host A",
+      "Speaker 1": "Guest B"
+    },
+    "takeaways": [
+      {
+        "text": "Main streets recover when foot traffic returns; wider sidewalks did more than parking.",
+        "tags": [
+          "Urban Planning",
+          "Economics"
+        ],
+        "position": 0,
+        "start_ms": 220500
+      }
+    ],
+    "chapters": [
+      {
+        "title": "Introduction",
+        "start_ms": 0,
+        "position": 0
+      },
+      {
+        "title": "Foot traffic first",
+        "start_ms": 220500,
+        "position": 1
+      },
+      {
+        "title": "Who loses",
+        "start_ms": 440500,
+        "position": 2
+      }
+    ],
+    "claims": []
+  },
+  "page2": {
+    "transcript": {
+      "segments": [
+        {
+          "idx": 8,
+          "start_ms": 415500,
+          "end_ms": 470000,
+          "speaker": "Host A",
+          "text": "Let's talk about the downside. Who loses when a main street gets popular again?"
+        },
+        {
+          "idx": 9,
+          "start_ms": 470500,
+          "end_ms": 525000,
+          "speaker": "Guest B",
+          "text": "Long-time tenants, usually. Rents rise and the hardware store becomes a wine bar."
+        },
+        {
+          "idx": 10,
+          "start_ms": 525500,
+          "end_ms": 580000,
+          "speaker": "Guest B",
+          "text": "Some towns cap commercial rent increases for existing tenants. It's controversial but it works."
+        },
+        {
+          "idx": 11,
+          "start_ms": 580500,
+          "end_ms": 635000,
+          "speaker": "Host A",
+          "text": "That's all for today. Thanks for listening."
+        }
+      ],
+      "total": 12,
+      "page": 1,
+      "page_size": 8,
+      "has_more": false
+    }
+  }
+}

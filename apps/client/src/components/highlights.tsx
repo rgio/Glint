@@ -150,6 +150,22 @@ export function HighlightCard({ highlight, showEpisode = false }: { highlight: H
           {message}
         </ThemedText>
       )}
+      {highlight.chapterTitle && (
+        <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
+          {highlight.chapterTitle}
+        </ThemedText>
+      )}
+      {highlight.transcriptExcerpt && (
+        <View style={[styles.excerpt, { borderColor: theme.border }]}>
+          <ThemedText type="small">{`“${highlight.transcriptExcerpt}”`}</ThemedText>
+          {highlight.transcriptConfidence === 'approximate' && (
+            // The audio differed from what was transcribed (usually other ads), so the words may be a little off.
+            <ThemedText type="small" themeColor="textSecondary">
+              Words may be slightly off: this episode&apos;s audio has changed since it was transcribed.
+            </ThemedText>
+          )}
+        </View>
+      )}
       <Pressable accessibilityRole="button" accessibilityLabel={highlight.note ? `Edit note: ${highlight.note}` : `Add note to ${range}`} onPress={() => openHighlightEditor({ id: highlight.id })}>
         {highlight.note ? (
           <ThemedText>{highlight.note}</ThemedText>
@@ -187,4 +203,5 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   grow: { flex: 1 },
   card: { gap: Spacing.one, padding: Spacing.three, borderRadius: Spacing.three },
+  excerpt: { gap: Spacing.one, borderLeftWidth: 3, paddingLeft: Spacing.two },
 });

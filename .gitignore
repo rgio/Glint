@@ -10,3 +10,6 @@ dist/
 test-results/
 playwright-report/
 .web-export/
+
+# Claude Code worktrees
+.claude/worktrees/

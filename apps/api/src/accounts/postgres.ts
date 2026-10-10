@@ -1,7 +1,8 @@
-import type { Highlight, Settings, SyncChange, User } from '@podcast/shared';
+import { HIGHLIGHT_FROM, HIGHLIGHT_SELECT, rowToHighlight, type HighlightRow } from '@podcast/content';
+import { withoutDerivedFields, type Settings, type SyncChange, type User } from '@podcast/shared';
 import type { Sql, TransactionSql } from 'postgres';
 
-import { mergeChange, type AccountStore, type Session, type SignInRequest, type VersionedChange } from './store';
+import { mergeChange, type AccountStore, type HighlightPage, type Session, type SignInRequest, type VersionedChange } from './store';
 
 type RequestRow = {
   id: string;
@@ -133,7 +134,9 @@ export class PostgresAccountStore implements AccountStore {
   async applyChanges(userId: string, changes: SyncChange[]) {
     return this.sql.begin(async (tx) => {
       let applied = 0;
-      for (const change of changes) {
+      for (const pushed of changes) {
+        // The excerpt, chapter and confidence are the server's to set, never the client's.
+        const change: SyncChange = pushed.kind === 'highlight' ? { kind: 'highlight', value: withoutDerivedFields(pushed.value) } : pushed;
         const existing = await this.load(tx, userId, change);
         const merged = mergeChange(existing, change);
         if (!merged) continue;
@@ -186,9 +189,11 @@ export class PostgresAccountStore implements AccountStore {
         return r && { kind: 'settings', value: r.settings };
       }
       case 'highlight': {
-        const [r] = await tx<{ highlight: Highlight }[]>`
-          select highlight from user_highlights where user_id = ${userId} and id = ${change.value.id} for update`;
-        return r && { kind: 'highlight', value: r.highlight };
+        // Without the context join: compared against what the client sent, which has none.
+        const [r] = await tx<HighlightRow[]>`
+          select h.*, null as excerpt, null as chapter_title, null as confidence from highlights h
+          where h.user_id = ${userId} and h.id = ${change.value.id} for update of h`;
+        return r && { kind: 'highlight', value: rowToHighlight(r) };
       }
     }
   }
@@ -232,10 +237,18 @@ export class PostgresAccountStore implements AccountStore {
         return;
       }
       case 'highlight': {
+        const h = change.value;
         await tx`
-          insert into user_highlights (user_id, id, highlight, version)
-          values (${userId}, ${change.value.id}, ${tx.json(change.value)}, nextval('sync_version'))
-          on conflict (user_id, id) do update set highlight = excluded.highlight, version = excluded.version`;
+          insert into highlights (user_id, id, episode_id, podcast_id, start_sec, end_sec, note, source,
+            anchor_duration_sec, anchor_enclosure_url, created_at, range_updated_at, note_updated_at, deleted, version)
+          values (${userId}, ${h.id}, ${h.episodeId}, ${h.podcastId}, ${h.startSec}, ${h.endSec}, ${h.note}, ${h.source},
+            ${h.anchorDurationSec}, ${h.anchorEnclosureUrl}, ${h.createdAt}, ${h.rangeUpdatedAt}, ${h.noteUpdatedAt},
+            ${h.deleted}, nextval('sync_version'))
+          on conflict (user_id, id) do update set episode_id = excluded.episode_id, podcast_id = excluded.podcast_id,
+            start_sec = excluded.start_sec, end_sec = excluded.end_sec, note = excluded.note, source = excluded.source,
+            anchor_duration_sec = excluded.anchor_duration_sec, anchor_enclosure_url = excluded.anchor_enclosure_url,
+            created_at = excluded.created_at, range_updated_at = excluded.range_updated_at,
+            note_updated_at = excluded.note_updated_at, deleted = excluded.deleted, version = excluded.version`;
         return;
       }
     }
@@ -255,9 +268,10 @@ export class PostgresAccountStore implements AccountStore {
         where user_id = ${userId} and version > ${after} order by version limit ${limit}`,
       this.sql<{ settings: Settings; version: string }[]>`
         select settings, version from user_settings where user_id = ${userId} and version > ${after}`,
-      this.sql<{ highlight: Highlight; version: string }[]>`
-        select highlight, version from user_highlights
-        where user_id = ${userId} and version > ${after} order by version limit ${limit}`,
+      // With the server-derived context, while it matches the current range.
+      this.sql<(HighlightRow & { version: string })[]>`
+        select ${this.sql.unsafe(HIGHLIGHT_SELECT)}, h.version from ${this.sql.unsafe(HIGHLIGHT_FROM)}
+        where h.user_id = ${userId} and h.version > ${after} order by h.version limit ${limit}`,
     ]);
     const all: VersionedChange[] = [
       ...subs.map((r): VersionedChange => ({
@@ -276,8 +290,28 @@ export class PostgresAccountStore implements AccountStore {
         version: BigInt(r.version),
       })),
       ...settings.map((r): VersionedChange => ({ kind: 'settings', value: r.settings, version: BigInt(r.version) })),
-      ...highlights.map((r): VersionedChange => ({ kind: 'highlight', value: r.highlight, version: BigInt(r.version) })),
+      ...highlights.map((r): VersionedChange => ({ kind: 'highlight', value: rowToHighlight(r), version: BigInt(r.version) })),
     ];
     return all.sort((a, b) => (a.version < b.version ? -1 : a.version > b.version ? 1 : 0)).slice(0, limit);
+  }
+
+  async searchHighlights(userId: string, opts: { q: string | null; offset: number; limit: number }): Promise<HighlightPage> {
+    const q = opts.q?.trim() || null;
+    const like = q && `%${q.replace(/[\\%_]/g, (m) => `\\${m}`)}%`;
+    // Notes and excerpts by full-text search (stemmed, so "onboard" finds "onboarding"); episode
+    // and show titles by substring.
+    const match = q
+      ? this.sql`and (h.note_tsv @@ websearch_to_tsquery('english', ${q})
+          or c.excerpt_tsv @@ websearch_to_tsquery('english', ${q})
+          or e.title ilike ${like} or p.title ilike ${like})`
+      : this.sql``;
+    const rows = await this.sql<HighlightRow[]>`
+      select ${this.sql.unsafe(HIGHLIGHT_SELECT)} from ${this.sql.unsafe(HIGHLIGHT_FROM)}
+      left join episodes e on e.id = h.episode_id
+      left join podcasts p on p.id = h.podcast_id
+      where h.user_id = ${userId} and not h.deleted ${match}
+      order by h.created_at desc, h.id
+      limit ${opts.limit + 1} offset ${opts.offset}`;
+    return { highlights: rows.slice(0, opts.limit).map(rowToHighlight), hasMore: rows.length > opts.limit };
   }
 }

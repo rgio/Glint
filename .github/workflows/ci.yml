@@ -14,9 +14,9 @@ jobs:
     name: Lint, typecheck, unit tests
     runs-on: ubuntu-latest
     services:
-      # The catalog and account store tests run against Postgres when TEST_DATABASE_URL is set.
+      # The store tests run against Postgres (with pgvector) when TEST_DATABASE_URL is set.
       postgres:
-        image: postgres:16
+        image: pgvector/pgvector:pg16
         env:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: podcast_test
@@ -72,7 +72,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:16
+        image: pgvector/pgvector:pg16
         env:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: podcast
@@ -93,9 +93,11 @@ jobs:
             -e WEB_URL=https://listen.example.com -e EMAIL_PROVIDER=postmark -e EMAIL_API_KEY=unused -e EMAIL_FROM=a@example.com \
             podcast-server
           docker run -d --name worker $env_args podcast-server worker
+          docker run -d --name content $env_args podcast-server content
           for i in $(seq 1 30); do curl -fsS localhost:4000/ready && break; sleep 1; done
           curl -fsS localhost:4000/ready
           curl -sS -o /dev/null localhost:4000/v1/podcasts/missing -w '%{http_code}\n' | grep 404
           sleep 3 && docker inspect -f '{{.State.Running}}' worker | grep true
+          docker inspect -f '{{.State.Running}}' content | grep true
       - if: always()
-        run: docker logs api; docker logs worker
+        run: docker logs api; docker logs worker; docker logs content

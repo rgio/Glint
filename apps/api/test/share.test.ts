@@ -32,6 +32,9 @@ const episode: Episode = {
   artworkUrl: null,
   season: null,
   episodeNumber: null,
+  transcriptUrl: null,
+  transcriptType: null,
+  chaptersUrl: null,
 };
 
 async function setup() {

@@ -1,7 +1,8 @@
 import { existsSync } from 'node:fs';
 
 import { migrate } from '@podcast/catalog';
-import type { SyncChange } from '@podcast/shared';
+import { PostgresUserDataStore } from '@podcast/content';
+import type { Highlight, SyncChange } from '@podcast/shared';
 import postgres from 'postgres';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 
@@ -18,6 +19,24 @@ const U2 = '00000000-0000-4000-8000-000000000002';
 const sub = (podcastId: string, updatedAt: number, deleted = false): SyncChange => ({
   kind: 'subscription',
   value: { podcastId, subscribedAt: 1000, autoDownload: false, updatedAt, deleted },
+});
+const highlight = (id: string, extra: Partial<Highlight> = {}): Highlight => ({
+  id,
+  episodeId: 'ep_1',
+  podcastId: 'pod_1',
+  startSec: 100,
+  endSec: 130,
+  note: null,
+  transcriptExcerpt: null,
+  chapterTitle: null,
+  anchorDurationSec: 1800,
+  anchorEnclosureUrl: null,
+  source: 'player',
+  createdAt: 1000,
+  rangeUpdatedAt: 1000,
+  noteUpdatedAt: 1000,
+  deleted: false,
+  ...extra,
 });
 const state = (episodeId: string, positionSec: number, updatedAt: number, played = false): SyncChange => ({
   kind: 'episodeState',
@@ -135,6 +154,37 @@ function accountStoreContract(makeStore: () => Promise<AccountStore>) {
     expect((await store.changesSince(U1, 0n, 10))[0]?.value).toMatchObject({ deleted: true });
   });
 
+  it('ignores excerpts and chapters a client sends: the server derives them', async () => {
+    await store.findOrCreateUser('a@example.com', U1);
+    const h = highlight('30000000-0000-4000-8000-000000000002', { note: 'mine' });
+    const faked = { ...h, transcriptExcerpt: 'made up', chapterTitle: 'Made up', transcriptConfidence: 'exact' as const };
+    expect(await store.applyChanges(U1, [{ kind: 'highlight', value: faked }])).toBe(1);
+    expect((await store.changesSince(U1, 0n, 10))[0]?.value).toMatchObject({ note: 'mine', transcriptExcerpt: null, chapterTitle: null });
+    // Sending it back with an excerpt changes nothing, so it doesn't bump the version. Nor does an
+    // older client's copy, which has no confidence field at all.
+    expect(await store.applyChanges(U1, [{ kind: 'highlight', value: faked }])).toBe(0);
+    const { transcriptConfidence: _, ...older } = h;
+    expect(await store.applyChanges(U1, [{ kind: 'highlight', value: older as Highlight }])).toBe(0);
+  });
+
+  it('searches live highlights by note, newest first, a page at a time', async () => {
+    await store.findOrCreateUser('a@example.com', U1);
+    await store.applyChanges(U1, [
+      { kind: 'highlight', value: highlight('30000000-0000-4000-8000-000000000011', { note: 'try on the onboarding flow', createdAt: 1000 }) },
+      { kind: 'highlight', value: highlight('30000000-0000-4000-8000-000000000012', { note: 'onboarding emails', createdAt: 2000 }) },
+      { kind: 'highlight', value: highlight('30000000-0000-4000-8000-000000000013', { note: 'pricing', createdAt: 3000 }) },
+      { kind: 'highlight', value: highlight('30000000-0000-4000-8000-000000000014', { note: 'onboarding, deleted', deleted: true }) },
+    ]);
+    const found = await store.searchHighlights(U1, { q: 'onboarding', offset: 0, limit: 1 });
+    expect(found.highlights.map((h) => h.note)).toEqual(['onboarding emails']);
+    expect(found.hasMore).toBe(true);
+    expect((await store.searchHighlights(U1, { q: 'onboarding', offset: 1, limit: 1 })).highlights.map((h) => h.note)).toEqual([
+      'try on the onboarding flow',
+    ]);
+    expect((await store.searchHighlights(U1, { q: null, offset: 0, limit: 10 })).highlights).toHaveLength(3);
+    expect((await store.searchHighlights(U2, { q: null, offset: 0, limit: 10 })).highlights).toEqual([]);
+  });
+
   it('keeps users apart and deletes everything with the account', async () => {
     await store.findOrCreateUser('a@example.com', U1);
     await store.findOrCreateUser('b@example.com', U2);
@@ -162,5 +212,27 @@ describe.skipIf(!TEST_DATABASE_URL)('PostgresAccountStore', () => {
     await migrate(sql);
     await sql`truncate users, sign_in_requests cascade`;
     return new PostgresAccountStore(sql);
+  });
+
+  it('sends the server-derived excerpt with a highlight while it matches the range', async () => {
+    await migrate(sql);
+    await sql`truncate users, sign_in_requests cascade`;
+    const store = new PostgresAccountStore(sql);
+    await store.findOrCreateUser('a@example.com', U1);
+    const h = highlight('30000000-0000-4000-8000-000000000021');
+    await store.applyChanges(U1, [{ kind: 'highlight', value: h }]);
+    const [first] = await store.changesSince(U1, 0n, 10);
+
+    const ctx = { transcriptId: null, excerpt: 'the words', chapterTitle: 'Ch', offsetSec: 0, confidence: 'approximate' as const };
+    expect(await new PostgresUserDataStore(sql).saveHighlightContext(U1, h.id, { ...ctx, forRangeUpdatedAt: 1000 })).toBe(true);
+    // A new version, so devices that already have the highlight pull it again with the excerpt.
+    const [filled] = await store.changesSince(U1, first!.version, 10);
+    expect(filled?.value).toMatchObject({ transcriptExcerpt: 'the words', chapterTitle: 'Ch', transcriptConfidence: 'approximate' });
+    expect((await store.searchHighlights(U1, { q: 'words', offset: 0, limit: 10 })).highlights).toHaveLength(1);
+
+    // After a range edit the old excerpt no longer applies.
+    await store.applyChanges(U1, [{ kind: 'highlight', value: { ...h, startSec: 90, rangeUpdatedAt: 2000 } }]);
+    const [moved] = await store.changesSince(U1, filled!.version, 10);
+    expect(moved?.value).toMatchObject({ startSec: 90, transcriptExcerpt: null });
   });
 });

@@ -23,7 +23,18 @@ export async function migrate(sql: Sql): Promise<string[]> {
     const applied: string[] = [];
     for (const file of files) {
       if (done.has(file)) continue;
-      await tx.unsafe(await readFile(new URL(file, MIGRATIONS_DIR), 'utf8'));
+      try {
+        await tx.unsafe(await readFile(new URL(file, MIGRATIONS_DIR), 'utf8'));
+      } catch (err) {
+        if (/extension "vector" is not available|could not open extension control file.*vector/i.test(String((err as Error).message))) {
+          throw new Error(
+            `Migration ${file} needs the pgvector extension, which this PostgreSQL server doesn't have. ` +
+              'Install pgvector 0.7 or newer for this server version (docs/deploy.md has the steps).',
+            { cause: err },
+          );
+        }
+        throw err;
+      }
       await tx`insert into schema_migrations (version) values (${file})`;
       applied.push(file);
     }

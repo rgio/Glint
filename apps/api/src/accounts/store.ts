@@ -10,6 +10,7 @@ import {
   type Subscription,
   type SyncChange,
   type User,
+  withoutDerivedFields,
 } from '@podcast/shared';
 
 export type SignInRequest = {
@@ -34,6 +35,8 @@ export type Session = {
 
 /** A change as stored: the synced value plus the server version that orders it. */
 export type VersionedChange = SyncChange & { version: bigint };
+
+export type HighlightPage = { highlights: Highlight[]; hasMore: boolean };
 
 /** Accounts, sessions and per-user synced state. Postgres in production, in memory for tests. */
 export interface AccountStore {
@@ -62,7 +65,21 @@ export interface AccountStore {
   applyChanges(userId: string, changes: SyncChange[]): Promise<number>;
   /** Changes with a version above `since`, oldest first, at most `limit`. */
   changesSince(userId: string, since: bigint, limit: number): Promise<VersionedChange[]>;
+  /**
+   * The listener's live highlights, newest first, optionally matching `q` in the note, the
+   * transcript excerpt, or the episode or show title.
+   */
+  searchHighlights(userId: string, opts: { q: string | null; offset: number; limit: number }): Promise<HighlightPage>;
 }
+
+/**
+ * Synced records are flat, so compare them key by key regardless of key order: a record stored
+ * as columns and one parsed from a request list their keys differently.
+ */
+const sameRecord = (a: object, b: object) => {
+  const keys = [...new Set([...Object.keys(a), ...Object.keys(b)])].sort();
+  return JSON.stringify(a, keys) === JSON.stringify(b, keys);
+};
 
 /** The merge rule for one kind of change: the value to keep, or null to keep what's stored. */
 export function mergeChange(existing: SyncChange | undefined, incoming: SyncChange): SyncChange | null {
@@ -85,7 +102,7 @@ export function mergeChange(existing: SyncChange | undefined, incoming: SyncChan
       merged = mergeHighlight(existing.value as Highlight, incoming.value);
       break;
   }
-  return JSON.stringify(merged) === JSON.stringify(existing.value) ? null : ({ kind: incoming.kind, value: merged } as SyncChange);
+  return sameRecord(merged, existing.value) ? null : ({ kind: incoming.kind, value: merged } as SyncChange);
 }
 
 export class InMemoryAccountStore implements AccountStore {
@@ -166,7 +183,9 @@ export class InMemoryAccountStore implements AccountStore {
     const mine = this.state.get(userId) ?? new Map<string, VersionedChange>();
     this.state.set(userId, mine);
     let applied = 0;
-    for (const change of changes) {
+    for (const pushed of changes) {
+      // The excerpt, chapter and confidence are the server's to set, never the client's.
+      const change: SyncChange = pushed.kind === 'highlight' ? { kind: 'highlight', value: withoutDerivedFields(pushed.value) } : pushed;
       const key = changeKey(change);
       const merged = mergeChange(mine.get(key), change);
       if (!merged) continue;
@@ -181,5 +200,15 @@ export class InMemoryAccountStore implements AccountStore {
       .filter((c) => c.version > since)
       .sort((a, b) => (a.version < b.version ? -1 : 1))
       .slice(0, limit);
+  }
+
+  async searchHighlights(userId: string, { q, offset, limit }: { q: string | null; offset: number; limit: number }) {
+    const needle = q?.trim().toLowerCase();
+    // No catalog here, so titles aren't searched; Postgres covers them.
+    const matches = [...(this.state.get(userId)?.values() ?? [])]
+      .flatMap((c) => (c.kind === 'highlight' && !c.value.deleted ? [c.value] : []))
+      .filter((h) => !needle || [h.note, h.transcriptExcerpt].some((t) => t?.toLowerCase().includes(needle)))
+      .sort((a, b) => b.createdAt - a.createdAt || (a.id < b.id ? -1 : 1));
+    return { highlights: matches.slice(offset, offset + limit), hasMore: matches.length > offset + limit };
   }
 }

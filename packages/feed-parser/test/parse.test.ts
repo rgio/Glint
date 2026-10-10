@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
-import { FeedParseError, parseDuration, parseFeed } from '../src';
+import { FeedParseError, parseDuration, parseFeed, pickTranscript } from '../src';
 
 const sample = readFileSync(new URL('./fixtures/sample.xml', import.meta.url), 'utf8');
 
@@ -38,6 +38,7 @@ describe('parseFeed', () => {
       season: 1,
       episodeNumber: 2,
       transcriptUrl: 'https://example.com/ep2.vtt',
+      transcriptType: 'text/vtt',
       chaptersUrl: 'https://example.com/ep2.json',
     });
   });
@@ -54,6 +55,25 @@ describe('parseFeed', () => {
 
   it('rejects documents that are not RSS', () => {
     expect(() => parseFeed('<html><body>hi</body></html>')).toThrow(FeedParseError);
+  });
+});
+
+describe('pickTranscript', () => {
+  const tag = (url: string, type?: string) => ({ '@_url': url, ...(type && { '@_type': type }) });
+
+  it('prefers JSON, then WebVTT, then SRT, then anything else', () => {
+    const tags = [
+      tag('https://e.com/t.html', 'text/html'),
+      tag('https://e.com/t.srt', 'application/x-subrip'),
+      tag('https://e.com/t.vtt', 'text/vtt'),
+    ];
+    expect(pickTranscript(tags)).toEqual({ url: 'https://e.com/t.vtt', type: 'text/vtt' });
+    expect(pickTranscript([...tags, tag('https://e.com/t.json', 'application/json; charset=utf-8')])?.url).toBe('https://e.com/t.json');
+  });
+
+  it('keeps an untimed transcript when that is all there is, and skips bad URLs', () => {
+    expect(pickTranscript([tag('ftp://e.com/t.txt', 'text/plain'), tag('https://e.com/t.txt')])).toEqual({ url: 'https://e.com/t.txt', type: null });
+    expect(pickTranscript([])).toBeNull();
   });
 });
 
